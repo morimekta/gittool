@@ -1,0 +1,13 @@
+.gt/
+*.o
+*.pb.h
+*.pb.cc
+*.pyc
+bin/
+*.out
+
+bazel-bin
+bazel-genfiles
+bazel-gittool
+bazel-out
+bazel-testlogs
