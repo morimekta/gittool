@@ -125,5 +125,8 @@ py_library(
     deps = [
         ':shared',
     ],
+    data = [
+        '//share:tzdata.dict'
+    ],
     visibility = ['//visibility:public'],
 )

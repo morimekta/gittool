@@ -24,6 +24,9 @@ py_library(
     deps = [
         '//utils:shared',
     ],
+    data = [
+        '//share:diffall.vim'
+    ],
     visibility = ['//visibility:public'],
 )
 
