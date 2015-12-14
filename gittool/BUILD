@@ -13,7 +13,6 @@ py_library(
         '//utils:console',
         '//utils:interactive',
         '//utils:selection',
-        '//utils:timeutil',
     ],
     visibility = ['//visibility:public'],
 )

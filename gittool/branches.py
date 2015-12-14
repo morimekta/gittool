@@ -1,4 +1,4 @@
-import re, os
+import os
 
 import argparse
 import subprocess
@@ -14,23 +14,27 @@ from utils import color
 from utils import console
 from utils import interactive
 from utils import selection
-from utils import timeutil
+
 
 class Branch(cmd.Command):
     def __init__(self):
         super(Branch, self).__init__('branch', 'Change branch interactively.')
-        self.__parser = argparse.ArgumentParser(prog='gt branch',
+        self.__parser = argparse.ArgumentParser(
+                prog='gt branch',
                 description='Change branch interactively.')
 
         group = self.__parser.add_mutually_exclusive_group()
-        group.add_argument('-a', '--all', action='store_true',
-                help='Show all (interchangeable) branches.')
-        group.add_argument('-r', '--remote', action='store_true',
-                help='Show remote branches instead of local.')
+        group.add_argument('-a', '--all',
+                           action='store_true',
+                           help='Show all (interchangeable) branches.')
+        group.add_argument('-r', '--remote',
+                           action='store_true',
+                           help='Show remote branches instead of local.')
 
         self.longest_branch_name = 0
         self.longest_remote_name = 0
 
+        self.__flags = None
         self.__branch = char.color(color.YELLOW)
         self.__ahead = char.color(color.BOLD, color.GREEN)
         self.__behind = char.color(color.BOLD, color.RED)
@@ -45,8 +49,7 @@ class Branch(cmd.Command):
         pass
 
     def get_extra_info(self, branch, colorset):
-        extra = ''
-        if branch.tracking != None:
+        if branch.tracking is not None:
             remote = branch.tracking.ljust(self.longest_remote_name)
             extra = ' <- %s%s%s%s' % (self.__tracking, remote, color.NONE, colorset)
         elif branch.diffbase is not gitconfig.master():
@@ -78,7 +81,7 @@ class Branch(cmd.Command):
 
     def display_tracking(self, branch, colorset):
         name = branch.branch
-        if name == None:
+        if name is None:
             name = '(None)'
         if branch.current:
             return '* %s%s%s' % (colorset.green, name, colorset)
@@ -99,7 +102,7 @@ class Branch(cmd.Command):
                 'Give name to the new branch:',
                 char_verifier=gitutil.verify_branch_character,
                 result_verifier=gitutil.verify_branch_name)
-        if new_branch == None or len(new_branch) == 0:
+        if new_branch is None or len(new_branch) == 0:
             console.info('Aborting: Empty branch name given.')
             return selection.Select.Cmd.EXIT
         # TODO(steineldar): Don't print output from git checkout, but
@@ -117,14 +120,14 @@ class Branch(cmd.Command):
         name = branch.branch
         if interactive.confirm('Do you really want to delte the branch ' +
                 repr(name) + '?'):
-            cmd = []
             if branch.remote:
                 origin, remote = branch.branch.split('/', 1)
                 cmd = ['git', 'push', origin, '+:%s' % remote]
             else:
                 cmd = ['git', 'branch', '-d', name]
             p = subprocess.Popen(cmd,
-                    stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+                                 stderr=subprocess.PIPE,
+                                 stdout=subprocess.PIPE)
             p.wait()
             success = True
             for l in p.stdout:
@@ -145,7 +148,8 @@ class Branch(cmd.Command):
         if interactive.confirm('Do you still want to delte the branch?'):
             cmd = ['git', 'branch', '-D', name]
             p = subprocess.Popen(cmd,
-                    stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+                                 stderr=subprocess.PIPE,
+                                 stdout=subprocess.PIPE)
             p.wait()
             for l in p.stdout:
                 pass
@@ -163,7 +167,7 @@ class Branch(cmd.Command):
     def __set_diffbase(self, branch):
         diffbase = gitutil.get_verified_diffbase(branch.branch, False, False)
 
-        if diffbase != None:
+        if diffbase is not None:
             # Must add newline and more to complete line. We are not strictly in
             # a consistent state here.
             # TODO(steineldar): Fix selection.Select() to handle cases like this.
@@ -181,21 +185,21 @@ class Branch(cmd.Command):
                 selected = i
 
         select = selection.Select('Set diffbase for branch \'%s\' to:' % (branch.branch),
-            items=remotes,
-            mkline=self.display_tracking,
-            current=selected)
+                                  items=remotes,
+                                  mkline=self.display_tracking,
+                                  current=selected)
         selected = select.select()
-        if selected == None:
+        if selected is None:
             return selection.Select.Cmd.EXIT
         if selected.branch == diffbase:
-            if branch.diffbase == None:
+            if branch.diffbase is None:
                 console.info('Branch already has no diffbase.')
             else:
                 console.info('Branch already has \'%s\' as diffbase.' % branch.diffbase)
             return selection.Select.Cmd.EXIT
 
         gitconfig.set_diffbase(branch.branch, selected.branch)
-        if selected.branch == None:
+        if selected.branch is None:
             console.info('Branch \'%s%s%s\' is %sno longer%s diffing against \'%s%s%s\'' % (
                     self.__branch, branch.branch, color.NONE,
                     self.__not_tracking, color.NONE,
@@ -206,10 +210,9 @@ class Branch(cmd.Command):
                     self.__tracking, selected.branch, color.NONE))
         
         return selection.Select.Cmd.EXIT
-            
 
     def __set_tracking(self, branch):
-        if branch.tracking != None:
+        if branch.tracking is not None:
             # Must add newline and more to complete line. We are not strictly in
             # a consistent state here.
             # TODO(steineldar): Fix selection.Select() to handle cases like this.
@@ -226,15 +229,15 @@ class Branch(cmd.Command):
                 remotes[i].current = True
                 selected = i
 
-        select = selection.Select('Set remote tracked branch for \'%s\' to:' % (branch.branch),
-            items=remotes,
-            mkline=self.display_tracking,
-            current=selected)
+        select = selection.Select('Set remote tracked branch for \'%s\' to:' % branch.branch,
+                                  items=remotes,
+                                  mkline=self.display_tracking,
+                                  current=selected)
         selected = select.select()
-        if selected == None:
+        if selected is None:
             return selection.Select.Cmd.EXIT
         if selected.branch == branch.tracking:
-            if branch.tracking == None:
+            if branch.tracking is None:
                 console.info('Branch is already not tracking anything.')
             else:
                 console.info('Branch is already tracking remote branch \'%s\'.' % branch.tracking)
@@ -242,7 +245,7 @@ class Branch(cmd.Command):
 
         gitconfig.set_tracking(branch.branch, selected.branch)
 
-        if selected.branch == None:
+        if selected.branch is None:
             console.info('Branch \'%s%s%s\' is %sno longer%s tracking \'%s%s%s\'' % (
                     self.__branch, branch.branch, color.NONE,
                     self.__not_tracking, color.NONE,
@@ -287,11 +290,11 @@ class Branch(cmd.Command):
                     selected = i
             branch.diffbase = gitutil.get_verified_diffbase(
                     branch.branch, False, True)
-            if branch.diffbase != None:
+            if branch.diffbase is not None:
                 remote = gitcore.get_branch(branch.diffbase)
                 branch.ahead_, branch.behind_ = gitcore.revision_diff(
                             branch.revision, remote.revision)
-            elif branch.tracking != None:
+            elif branch.tracking is not None:
                 if remote_branches.has_key(branch.tracking):
                     remote = remote_branches[branch.tracking]
                     branch.ahead_, branch.behind_ = gitcore.revision_diff(
@@ -300,14 +303,13 @@ class Branch(cmd.Command):
                     branch.ahead_ = 0
                     branch.behind_ = 0
 
-        cmd = self.get_commands()
-        select = selection.Select('Move from branch \'%s\' to:' % (current),
-            items=items,
-            commands=cmd,
-            mkline=self.display_string,
-            current=selected)
+        select = selection.Select('Move from branch \'%s\' to:' % current,
+                                  items=items,
+                                  commands=self.get_commands(),
+                                  mkline=self.display_string,
+                                  current=selected)
         selected = select.select()
-        if selected == None:
+        if selected is None:
             return
 
         if branch.remote:
@@ -325,16 +327,23 @@ class Branch(cmd.Command):
 
 class NewCL(cmd.Command):
     def __init__(self):
-        super(NewCL, self).__init__('newcl',
+        super(NewCL, self).__init__(
+                'newcl',
                 'Select files from current branch to base new branch on.')
-        self.__parser = argparse.ArgumentParser(prog='gt newcl',
+        self.__parser = argparse.ArgumentParser(
+                prog='gt newcl',
                 description='Select files from current branch to base new branch on.')
 
-        self.__parser.add_argument('-f', '--files', metavar='F', nargs='*', type=str,
-                help='Files to select for new branch.')
-        self.__parser.add_argument('-b', '--branch', metavar='B', type=str,
-                help='Branch to base changes on.',
-                default=None)
+        self.__parser.add_argument('-f', '--files',
+                                   metavar='F',
+                                   nargs='*',
+                                   type=str,
+                                   help='Files to select for new branch.')
+        self.__parser.add_argument('-b', '--branch',
+                                   metavar='B',
+                                   type=str,
+                                   help='Branch to base changes on.',
+                                   default=None)
 
     def __display_line(self, item, colorset):
         return '%-2s %s' % (item.status, item.name)
@@ -348,7 +357,7 @@ class NewCL(cmd.Command):
             return
 
         current_branch = gitcore.current_branch()
-        if self.__flags.branch == None:
+        if self.__flags.branch is None:
           self.__flags.branch = gitconfig.get_diffbase(current_branch)
 
         provider = gitdiff.GitProvider(lambda: self.__path,
@@ -371,9 +380,9 @@ class NewCL(cmd.Command):
 
             select = selection.MultiSelect(
                     'Select files to pass to new branch:', select_files,
-                    mkline = self.__display_line)
+                    mkline=self.__display_line)
             files = select.select()
-            if files == None or len(files) == 0:
+            if files is None or len(files) == 0:
                 console.info('No files selected.')
                 return
         if len(files) == 0:
@@ -385,7 +394,7 @@ class NewCL(cmd.Command):
                 'Give name to the new branch:',
                 char_verifier=gitutil.verify_branch_character,
                 result_verifier=gitutil.verify_branch_name)
-        if new_branch == None or len(new_branch) == 0:
+        if new_branch is None or len(new_branch) == 0:
             console.info('Aborting: Empty branch name given.')
 
         if os.system('git checkout %s > /dev/null' % self.__flags.branch) != 0:
@@ -398,7 +407,6 @@ class NewCL(cmd.Command):
                 os.system('rm %s' % f.local)
             else:
                 os.system('git checkout %s %s' % (old_branch, f.local))
-
 
 
 """ ------------------------------- PRIVATE ------------------------------- """

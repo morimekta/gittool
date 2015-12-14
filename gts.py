@@ -6,29 +6,35 @@ from utils.color import RED, YELLOW
 from utils.console import warn
 from utils.strutil import ljust, hilite
 
-def print_help():
-    __flags.print_help()
 
 class Match(object):
-    def __init__(self, file, num, line):
-        self.file = file
+    def __init__(self, filename, num, line):
+        self.filename = filename
         self.num = num
         self.line = line
 
-def main(argv):
-    __fparser = argparse.ArgumentParser(prog=argv[0],
-            description='Search in files and get structured output.')
-    __fparser.add_argument('-f', '--file', type=re.compile,
-            help='Pattern to match file names.')
-    __fparser.add_argument('-p', '--path', action='append',
-            help='File path to search within. Can be repeated.')
-    __fparser.add_argument('--tab', type=str, default='  ',
-            help='Tab replacement.')
-    __fparser.add_argument('-i', '--ignorecase', action='store_true',
-            help='Search case insensitive')
 
-    __fparser.add_argument('pattern', type=re.compile, nargs='+',
-            help='The search patterns.')
+def main(argv):
+    __fparser = argparse.ArgumentParser(
+            prog=argv[0],
+            description='Search in files and get structured output.')
+    __fparser.add_argument('-f', '--file',
+                           type=re.compile,
+                           help='Pattern to match file names.')
+    __fparser.add_argument('-p', '--path',
+                           action='append',
+                           help='File path to search within. Can be repeated.')
+    __fparser.add_argument('--tab',
+                           type=str,
+                           default='  ',
+                           help='Tab replacement.')
+    __fparser.add_argument('-i', '--ignorecase',
+                           action='store_true',
+                           help='Search case insensitive')
+    __fparser.add_argument('pattern',
+                           type=re.compile,
+                           nargs='+',
+                           help='The search patterns.')
 
     flags = None
     try:
@@ -39,11 +45,11 @@ def main(argv):
         __fparser.print_help()
         exit(1)
 
-
-    command = []
-    command.append('grep')
-    command.append('-n')  # Show line number
-    command.append('-R')  # Recursive
+    command = [
+      'grep',
+      '-n',  # Show line number
+      '-R',  # Recursive
+    ]
 
     re_arg = 0
     if flags.ignorecase:
@@ -53,46 +59,47 @@ def main(argv):
         p = re.sub(r'(["\'\\])', r'\\\1', pattern.pattern)
         command.append('-e "%s"' % p)
 
-    if flags.path != None and len(flags.path) > 0:
+    if flags.path is not None and len(flags.path) > 0:
         for path in flags.path:
             command.append(path)
     else:
         command.append('*')
 
-    cmd = []
-    cmd.append(' '.join(command))
-    cmd.append('grep -v "^Bin.r fil .* samsvarer$"')
-    cmd.append('grep -v "^Binary file .* matches$"')
+    cmd = [
+      ' '.join(command),
+      'grep -v -e "^Bin.r fil .* samsvarer$" -e "^Binary file .* matches$"',
+    ]
 
     grep = os.popen(' | '.join(cmd))
 
     results = []
-    longestfile = 0
+    longest_file = 0
 
     replace = color(RED) + '\\1' + color(0)
 
     for line in grep:
-        match = __linepattern.match(line)
-        if match == None:
+        match = __line_pattern.match(line)
+        if match is None:
             print "Error parsing line: " + line
             continue
-        file = match.group('file')
-        if ignore_file(file):
+        filename = match.group('file')
+        if ignore_file(filename):
             continue
-        if flags.file != None and flags.file.search(file) == None:
+        if flags.file is not None and flags.file.search(filename) is None:
             continue
-        longestfile = max(longestfile, len(file))
+        longest_file = max(longest_file, len(filename))
         results.append(Match(
-                file = file,
-                num  = int(match.group('num')),
-                line = color_line(
+                filename,
+                int(match.group('num')),
+                color_line(
                     flags.pattern, replace, match.group('line'), re_arg),
                 ))
 
     for match in results:
-        file = ljust(hilite(match.file, color(YELLOW)), longestfile + 1)
+        filename = ljust(hilite(match.file, color(YELLOW)), longest_file + 1)
         line = match.line.replace('\t', flags.tab)
-        print '%s:%4d :%s' % (file, match.num, line)
+        print '%s:%4d :%s' % (filename, match.num, line)
+
 
 def color_line(patterns, replace, line, re_arg):
     for p in patterns:
@@ -101,7 +108,7 @@ def color_line(patterns, replace, line, re_arg):
     return line
 
 
-__linepattern = re.compile(r'(?P<file>[^:]*):(?P<num>[\d]*):(?P<line>.*)$')
+__line_pattern = re.compile(r'(?P<file>[^:]*):(?P<num>[\d]*):(?P<line>.*)$')
 
 
 if __name__ == '__main__':

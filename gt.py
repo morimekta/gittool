@@ -5,8 +5,10 @@ from gittool import gitcmd
 from utils import cmd
 from utils import console
 
+
 def main(argv):
     run_gt(argv[0], argv[1:])
+
 
 def run_gt(program, argv):
     command = None
