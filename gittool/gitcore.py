@@ -77,6 +77,9 @@ class Branch(object):
         self.tracking = None
         self.diffbase = None
 
+        self.ahead_ = None
+        self.behind_ = None
+
     def __str__(self):
         return self.branch
 

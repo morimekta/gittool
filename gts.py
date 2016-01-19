@@ -97,7 +97,7 @@ def main(argv):
                 ))
 
     for match in results:
-        filename = ljust(hilite(match.file, color(YELLOW)), longest_file + 1)
+        filename = ljust(hilite(match.filename, color(YELLOW)), longest_file + 1)
         line = match.line.replace('\t', flags.tab)
         print '%s:%4d :%s' % (filename, match.num, line)
 
