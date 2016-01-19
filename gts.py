@@ -1,3 +1,4 @@
+#!/usr/bin/python
 import sys, os, re, argparse
 
 from gittool.gitignore import ignore_file
