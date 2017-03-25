@@ -1,13 +1,38 @@
-.gt/
-*.o
-*.pb.h
-*.pb.cc
-*.pyc
-bin/
-*.out
+*.class
 
+# Mobile Tools for Java (J2ME)
+.mtj.tmp/
+
+# Package Files #
+*.jar
+*.war
+*.ear
+
+# virtual machine crash logs, see http://www.java.com/en/download/usage/error_hotspot.xml
+hs_err_pid*
+
+bazel-utils
 bazel-bin
 bazel-genfiles
-bazel-gittool
-bazel-out
 bazel-testlogs
+bazel-out
+
+target/
+target
+out/
+out
+
+.idea/*
+.idea/!codeStyleSettings.xml
+!.idea/codeStyleSettings.xml
+*.iml
+
+dependency-reduced-pom.xml
+pom.xml.versionsBackup
+pom.xml.releaseBackup
+release.properties
+
+_site/
+_site
+
+.gt/

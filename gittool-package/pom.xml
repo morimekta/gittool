@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"
+         xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>net.morimekta.gittool</groupId>
+        <artifactId>gittool</artifactId>
+        <version>2.0-SNAPSHOT</version>
+    </parent>
+    <artifactId>gittool-package</artifactId>
+    <name>Git Tool : Packaging</name>
+    <description>
+        Common classes and utilities for gittool.
+    </description>
+
+    <dependencies>
+        <dependency>
+            <groupId>net.morimekta.gittool</groupId>
+            <artifactId>gittool-gt</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <finalName>gittool</finalName>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-assembly-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>create-gittool-assembly</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>single</goal>
+                        </goals>
+                        <configuration>
+                            <descriptors>
+                                <descriptor>src/assembly/gittool.xml</descriptor>
+                            </descriptors>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.vafer</groupId>
+                <artifactId>jdeb</artifactId>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>jdeb</goal>
+                        </goals>
+                        <configuration>
+                            <skip>${disable.distribution.packaging}</skip>
+                            <deb>[[buildDir]]/gittool-[[version]]_all.[[extension]]</deb>
+                            <verbose>true</verbose>
+                            <snapshotExpand>true</snapshotExpand>
+                            <snapshotEnv>USER</snapshotEnv>
+
+                            <dataSet>
+                                <data>
+                                    <src>${project.basedir}/src/deb/bin/gt</src>
+                                    <type>file</type>
+                                    <mapper>
+                                        <type>perm</type>
+                                        <prefix>/usr/local/bin</prefix>
+                                        <filemode>755</filemode>
+                                    </mapper>
+                                </data>
+                                <data>
+                                    <src>${project.basedir}/src/deb/share/diffall.vim</src>
+                                    <type>file</type>
+                                    <mapper>
+                                        <type>perm</type>
+                                        <prefix>/usr/local/share/gittool</prefix>
+                                    </mapper>
+                                </data>
+                                <data>
+                                    <src>${project.parent.basedir}/gittool-gt/target/gt.jar</src>
+                                    <type>file</type>
+                                    <mapper>
+                                        <type>perm</type>
+                                        <prefix>/usr/local/share/gittool</prefix>
+                                    </mapper>
+                                </data>
+                            </dataSet>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>rpm-maven-plugin</artifactId>
+                <extensions>true</extensions>
+                <executions>
+                    <execution>
+                        <id>attach-rpm</id>
+                        <goals>
+                            <goal>attached-rpm</goal>
+                        </goals>
+                        <configuration>
+                            <!-- identification -->
+                            <disabled>${disable.distribution.packaging}</disabled>
+                            <name>gittool</name>
+                            <version>${project.version}</version>
+                            <license>Apache 2.0</license>
+                            <group>Development/Tools</group>
+
+                            <!-- dependencies -->
+                            <requires>
+                                <require>java &gt;= 1.8</require>
+                            </requires>
+
+                            <!-- mapping -->
+                            <mappings>
+                                <mapping>
+                                    <directory>/usr/local/bin</directory>
+                                    <filemode>755</filemode>
+                                    <username>root</username>
+                                    <sources>
+                                        <source>
+                                            <location>${project.basedir}/src/deb/bin</location>
+                                        </source>
+                                    </sources>
+                                </mapping>
+                                <mapping>
+                                    <directory>/usr/local/share/gittool</directory>
+                                    <filemode>644</filemode>
+                                    <sources>
+                                        <source>
+                                            <location>${project.basedir}/src/deb/share/diffall.vim</location>
+                                        </source>
+                                        <source>
+                                            <location>${project.parent.basedir}/gittool-gt/target/gt.jar</location>
+                                        </source>
+                                    </sources>
+                                </mapping>
+                            </mappings>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <configuration>
+                    <skip>true</skip>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>
