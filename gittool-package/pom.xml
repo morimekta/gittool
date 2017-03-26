@@ -119,7 +119,7 @@
                                 <mapping>
                                     <directory>/usr/local/bin</directory>
                                     <filemode>755</filemode>
-                                    <username>git_root</username>
+                                    <username>root</username>
                                     <sources>
                                         <source>
                                             <location>${project.basedir}/src/deb/bin</location>
