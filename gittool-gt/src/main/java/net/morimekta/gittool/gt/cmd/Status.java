@@ -17,6 +17,7 @@ package net.morimekta.gittool.gt.cmd;
 
 import net.morimekta.console.args.ArgumentParser;
 import net.morimekta.console.args.Flag;
+import net.morimekta.console.args.Option;
 import net.morimekta.console.chr.Color;
 import net.morimekta.gittool.gt.GitTool;
 
@@ -31,8 +32,6 @@ import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryState;
 import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.revwalk.RevSort;
-import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 
 import java.io.IOException;
@@ -42,7 +41,6 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
 
@@ -202,6 +200,11 @@ public class Status extends Command {
         this.files = files;
     }
 
+    private String branch = null;
+    private void setBranch(String branch) {
+        this.branch = branch;
+    }
+
     public Status(ArgumentParser parent) {
         super(parent);
     }
@@ -209,25 +212,9 @@ public class Status extends Command {
     @Override
     public ArgumentParser makeParser() {
         ArgumentParser parser = new ArgumentParser(getParent().getProgram() + " diff", getParent().getVersion(), "File diff selection.");
+        parser.add(new Option("--branch", "b", "NAME", "Show status for branch", this::setBranch, "HEAD"));
         parser.add(new Flag("--files", "f", "Show file listing", this::setFiles));
         return parser;
-    }
-
-    private Optional<RevCommit> commitOf(Repository repository, String branch) throws IOException {
-        try( RevWalk revWalk = new RevWalk(repository) ) {
-            ObjectId oid = repository.resolve(refName(branch));
-            revWalk.markStart(revWalk.parseCommit(oid));
-            revWalk.sort(RevSort.COMMIT_TIME_DESC);
-            return Optional.ofNullable(ImmutableList.copyOf(revWalk).get(0));
-        }
-    }
-
-    private String refName(String branch) {
-        if (remote(branch)) {
-            return "refs/remotes/" + branch;
-        } else {
-            return "refs/heads/" + branch;
-        }
     }
 
     private String date(RevCommit commit) {
@@ -246,11 +233,6 @@ public class Status extends Command {
         }
     }
 
-    private boolean remote(String branch) {
-        // a/b is branch 'b' in remote 'a', so 'origin/master'...
-        return branch.contains("/");
-    }
-
     @Override
     public void execute(GitTool gt) throws IOException {
         try (Repository repository = gt.getRepository()) {
@@ -261,30 +243,30 @@ public class Status extends Command {
 
             Git git = new Git(repository);
             String currentBranch = repository.getBranch();
-            String diffToBranch = gt.getDiffbase(currentBranch);
+            String diffWithBranch = gt.getDiffbase(currentBranch);
 
-            Ref currentRef = repository.getRef("refs/heads/" + currentBranch);
-            Ref diffToRef = remote(diffToBranch) ? repository.getRef("refs/remotes/" + diffToBranch) : repository.getRef("refs/heads/" + diffToBranch);
+            Ref currentRef = repository.getRef(gt.refName(currentBranch));
+            Ref diffWithRef = repository.getRef(gt.refName(diffWithBranch));
 
             ObjectId currentHead = currentRef.getObjectId();
-            ObjectId diffToHead = diffToRef.getObjectId();
+            ObjectId diffWithHead = diffWithRef.getObjectId();
 
             // RevCommit currentCommit = commitOf(repository, currentHead);
 
-            if (!currentHead.equals(diffToHead)) {
+            if (!currentHead.equals(diffWithHead)) {
                 String stats = "";
-                String diff = remote(diffToBranch)
-                              ? format("[->%s%s%s]", DIM, diffToBranch, CLEAR)
-                              : format("[d:%s%s%s] ", CLR_BASE_BRANCH, diffToBranch, CLEAR);
+                String diff = gt.isRemote(diffWithBranch)
+                              ? format("[->%s%s%s]", DIM, diffWithBranch, CLEAR)
+                              : format("[d:%s%s%s] ", CLR_BASE_BRANCH, diffWithBranch, CLEAR);
 
-                List<RevCommit> localCommits = ImmutableList.copyOf(git.log().addRange(diffToHead, currentHead).call());
-                List<RevCommit> remoteCommits = ImmutableList.copyOf(git.log().addRange(currentHead, diffToHead).call());
+                List<RevCommit> localCommits = ImmutableList.copyOf(git.log().addRange(diffWithHead, currentHead).call());
+                List<RevCommit> remoteCommits = ImmutableList.copyOf(git.log().addRange(currentHead, diffWithHead).call());
 
                 localCommits = Lists.reverse(localCommits);
                 remoteCommits = Lists.reverse(remoteCommits);
 
-                int adds = localCommits.size();
-                int subs = remoteCommits.size();
+                int commits = localCommits.size();
+                int missing = remoteCommits.size();
 
                 RevCommit ancestor, local;
                 if (remoteCommits.size() > 0) {
@@ -296,21 +278,21 @@ public class Status extends Command {
                                        .call()));
                     ancestor = sub2.get(0);
                 } else {
-                    ancestor = commitOf(repository, diffToBranch).orElseThrow(() -> new IOException("No commit in " + diffToBranch));
+                    ancestor = gt.commitOf(repository, diffWithBranch).orElseThrow(() -> new IOException("No commit in " + diffWithBranch));
                 }
                 if (localCommits.size() > 0) {
                     local = localCommits.get(localCommits.size() - 1);
                 } else {
-                    local = commitOf(repository, currentBranch).orElseThrow(() -> new IOException("No commit in " + currentBranch));
+                    local = gt.commitOf(repository, currentBranch).orElseThrow(() -> new IOException("No commit in " + currentBranch));
                 }
 
-                if (adds > 0 || subs > 0) {
-                    if (adds == 0) {
-                        stats = format(" [%s-%d%s]", CLR_SUBS, subs, CLEAR);
-                    } else if (subs == 0) {
-                        stats = format(" [%s+%d%s]", CLR_ADDS, adds, CLEAR);
+                if (commits > 0 || missing > 0) {
+                    if (commits == 0) {
+                        stats = format(" [%s-%d%s]", CLR_SUBS, missing, CLEAR);
+                    } else if (missing == 0) {
+                        stats = format(" [%s+%d%s]", CLR_ADDS, commits, CLEAR);
                     } else {
-                        stats = format(" [%s+%d%s,%s-%d%s]", CLR_ADDS, adds, CLEAR, CLR_SUBS, subs, CLEAR);
+                        stats = format(" [%s+%d%s,%s-%d%s]", CLR_ADDS, commits, CLEAR, CLR_SUBS, missing, CLEAR);
                     }
                 }
 
@@ -326,6 +308,7 @@ public class Status extends Command {
 
                     // finally get the list of changed files
                     List<DiffEntry> diffs = new Git(repository).diff()
+                                                               .setShowNameAndStatusOnly(true)
                                                                .setOldTree(ancestorTreeIter)
                                                                .setNewTree(localTreeIter)
                                                                .call();
@@ -363,17 +346,19 @@ public class Status extends Command {
                     }
                 }
             } else {
-                RevCommit diffToCommit = commitOf(repository, diffToBranch).orElseThrow(() -> new IOException("No commit in " + diffToBranch));
+                RevCommit diffWithCommit = gt.commitOf(repository, diffWithBranch).orElseThrow(() -> new IOException("No commit in " + diffWithBranch));
                 System.out.println(format("No commits on %s%s%s since %s -- %s%s%s",
-                                          GREEN, currentBranch, CLEAR, date(diffToCommit), DIM, diffToCommit.getShortMessage(), CLEAR));
+                                          GREEN, currentBranch, CLEAR, date(diffWithCommit), DIM, diffWithCommit.getShortMessage(), CLEAR));
             }
 
             // Check for staged and unstaged changes.
             if (files) {
                 List<DiffEntry> staged = new Git(repository).diff()
+                                                            .setShowNameAndStatusOnly(true)
                                                             .setCached(true)
                                                             .call();
                 List<DiffEntry> unstaged = new Git(repository).diff()
+                                                              .setShowNameAndStatusOnly(true)
                                                               .setCached(false)
                                                               .call();
 
@@ -410,9 +395,11 @@ public class Status extends Command {
                 }
             } else {
                 List<DiffEntry> staged = new Git(repository).diff()
+                                                            .setShowNameAndStatusOnly(true)
                                                             .setCached(true)
                                                             .call();
                 List<DiffEntry> unstaged = new Git(repository).diff()
+                                                              .setShowNameAndStatusOnly(true)
                                                               .setCached(false)
                                                               .call();
 

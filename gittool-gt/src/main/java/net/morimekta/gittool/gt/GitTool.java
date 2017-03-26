@@ -27,13 +27,20 @@ import net.morimekta.gittool.gt.cmd.Command;
 import net.morimekta.gittool.gt.cmd.Help;
 import net.morimekta.gittool.gt.cmd.Status;
 
+import com.google.common.collect.ImmutableList;
+import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.revwalk.RevSort;
+import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.Locale;
+import java.util.Optional;
 
 import static net.morimekta.console.util.Parser.dir;
 
@@ -139,7 +146,46 @@ public class GitTool {
         if (tmp != null) {
             return tmp;
         }
+        String remote = getRemote(branch);
+        if (remote != null) {
+            return remote;
+        }
         return getDefaultBranch();
+    }
+
+    public String getRemote(String branch) {
+        String remote = repository.getConfig().getString("branch", branch, "remote");
+        if (remote != null) {
+            String ref = repository.getConfig().getString("branch", branch, "merge");
+            if (ref != null) {
+                if (ref.startsWith("refs/heads/")) {
+                    return remote + "/" + ref.substring(11);
+                }
+            }
+        }
+        return null;
+    }
+
+    public Optional<RevCommit> commitOf(Repository repository, String branch) throws IOException {
+        try( RevWalk revWalk = new RevWalk(repository) ) {
+            ObjectId oid = repository.resolve(refName(branch));
+            revWalk.markStart(revWalk.parseCommit(oid));
+            revWalk.sort(RevSort.COMMIT_TIME_DESC);
+            return Optional.ofNullable(ImmutableList.copyOf(revWalk).get(0));
+        }
+    }
+
+    public boolean isRemote(String branch) {
+        // a/b is branch 'b' in remote 'a', so 'origin/master'...
+        return branch.contains("/");
+    }
+
+    public String refName(String branch) {
+        if (isRemote(branch)) {
+            return "refs/remotes/" + branch;
+        } else {
+            return "refs/heads/" + branch;
+        }
     }
 
     public static void main(String... args) {
@@ -178,6 +224,12 @@ public class GitTool {
                 System.err.println();
                 e.printStackTrace();
             }
+        } catch (GitAPIException e) {
+            System.err.println("Git Error: " + e.getMessage());
+            if (gt.verbose) {
+                System.err.println();
+                e.printStackTrace();
+            }
         } catch (IOException | UncheckedIOException e) {
             System.err.println("I/O Error: " + e.getMessage());
             if (gt.verbose) {
@@ -185,7 +237,7 @@ public class GitTool {
                 e.printStackTrace();
             }
         } catch (Exception e) {
-            System.err.println("Unhandled exception: " + e.getMessage());
+            System.err.println("Internal Error: " + e.getMessage());
             if (gt.verbose) {
                 System.err.println();
                 e.printStackTrace();
