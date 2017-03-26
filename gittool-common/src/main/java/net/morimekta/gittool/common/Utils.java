@@ -45,14 +45,20 @@ public class Utils {
         try {
             // If run from the 'normal' jar in the share directory, then the location of the
             // jar file is the share directory for gittool.
-            return new File(Utils.class.getProtectionDomain()
-                                       .getCodeSource()
-                                       .getLocation()
-                                       .toURI()
-                                       .getPath())
-                    .getCanonicalFile()
-                    .getParentFile()
-                    .getAbsoluteFile();
+            File location = new File(Utils.class.getProtectionDomain()
+                                                .getCodeSource()
+                                                .getLocation()
+                                                .toURI()
+                                                .getPath())
+                    .getCanonicalFile().getAbsoluteFile();
+            if (location.isDirectory()) {
+                // E.g. .../gittool-gt/target/classes
+                // contains the resources locally
+                return location;
+            } else {
+                // E.g. /usr/local/share/gittool/gt.jar
+                return location.getParentFile();
+            }
         } catch (URISyntaxException e) {
             throw new RuntimeException(e.getMessage(), e);
         } catch (IOException e) {

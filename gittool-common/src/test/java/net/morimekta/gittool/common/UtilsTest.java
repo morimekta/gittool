@@ -22,8 +22,7 @@ package net.morimekta.gittool.common;
 
 import org.junit.Test;
 
-import java.io.File;
-
+import static java.io.File.separator;
 import static org.hamcrest.CoreMatchers.endsWith;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.notNullValue;
@@ -40,6 +39,6 @@ public class UtilsTest {
     @Test
     public void testShareLocation() {
         // When testing it is the /target directory of the build.
-        assertThat(Utils.shareLocation().toString(), endsWith(File.separator + "target"));
+        assertThat(Utils.shareLocation().toString(), endsWith(separator + "target" + separator + "classes"));
     }
 }

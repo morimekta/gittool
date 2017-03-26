@@ -18,6 +18,15 @@ package net.morimekta.gittool.gt.cmd;
 import net.morimekta.console.args.ArgumentParser;
 import net.morimekta.gittool.gt.GitTool;
 
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.api.ListBranchCommand;
+import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.lib.Ref;
+import org.eclipse.jgit.lib.Repository;
+
+import java.io.IOException;
+import java.util.List;
+
 /**
  * Interactively manage branches.
  */
@@ -28,15 +37,27 @@ public class Branch extends Command {
 
     @Override
     public ArgumentParser makeParser() {
-        ArgumentParser parser = new ArgumentParser(getParent().getProgram() + " branch", getParent().getVersion(), "Manage branches interactively.");
-
-        // ...
-
-        return parser;
+        return new ArgumentParser(getParent().getProgram() + " branch", getParent().getVersion(), "Manage branches interactively.");
     }
 
     @Override
-    public void execute(GitTool opts) {
-        System.err.println("Branch!!");
+    public void execute(GitTool gt) throws IOException {
+        try (Repository repository = gt.getRepository()) {
+            Git git = new Git(repository);
+            ListBranchCommand bl = git.branchList();
+
+            String current = repository.getFullBranch();
+            List<Ref> branches = bl.call();
+
+            for (Ref ref : branches) {
+                if (ref.getName().equals(current)) {
+                    System.out.println("Current: " + ref.getName());
+                } else {
+                    System.out.println(" Branch: " + ref.getName());
+                }
+            }
+        } catch (GitAPIException e) {
+            throw new IllegalStateException(e.getMessage(), e);
+        }
     }
 }

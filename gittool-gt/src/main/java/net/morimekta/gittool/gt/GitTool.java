@@ -25,21 +25,33 @@ import net.morimekta.gittool.common.Utils;
 import net.morimekta.gittool.gt.cmd.Branch;
 import net.morimekta.gittool.gt.cmd.Command;
 import net.morimekta.gittool.gt.cmd.Help;
+import net.morimekta.gittool.gt.cmd.Status;
+
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.util.Locale;
 
 import static net.morimekta.console.util.Parser.dir;
 
 public class GitTool {
-    private File root = null;
+    private static final String DOT_GIT = ".git";
+
+    private SubCommandSet<Command> subCommandSet = null;
+
     private Command command = null;
-    private boolean help = false;
+    private boolean help    = false;
     private boolean version = false;
     private boolean verbose = false;
 
-    private void setRoot(File root) {
-        this.root = root;
+    private File       repositoryRoot = null;
+    private Repository repository     = null;
+
+    private void setRepositoryRoot(File git_root) {
+        this.repositoryRoot = git_root;
     }
 
     private void setCommand(Command command) {
@@ -58,47 +70,85 @@ public class GitTool {
         this.verbose = verbose;
     }
 
-    public File getRoot() throws IOException {
-        if (root == null) {
+    public File getRepositoryRoot() throws IOException {
+        if (repositoryRoot == null) {
             File current = new File(".").getCanonicalFile().getAbsoluteFile();
-            while (!(new File(current, ".git")).exists()) {
+            while (!(new File(current, DOT_GIT)).exists()) {
                 current = current.getParentFile();
                 if (current == null) {
-                    throw new ArgumentException("Not in a git repository!");
+                    throw new IOException("Not in a git repository!");
                 }
             }
-            root = current;
+            repositoryRoot = current;
         }
-        return root;
+        return repositoryRoot;
     }
 
-    public File getDotGt() throws IOException {
-        return new File(getRoot(), ".gt");
-    }
-
-    public Command getCommand() {
-        return command;
+    public Repository getRepository() throws IOException {
+        if (repository == null) {
+            repository = new FileRepositoryBuilder()
+                    .setGitDir(new File(getRepositoryRoot(), DOT_GIT))
+                    .build();
+        }
+        return repository;
     }
 
     public boolean showHelp() {
         return (help || command == null);
     }
 
-    public static void main(String... args) {
+    private boolean showVersion() {
+        return version && !help;
+    }
+
+    private SubCommandSet<Command> getSubCommandSet() {
+        return subCommandSet;
+    }
+
+    private ArgumentParser makeParser() {
         ArgumentParser parser = new ArgumentParser("gt",
                                                    Utils.versionString(),
                                                    "Extra git tools by morimekta");
-        GitTool gt = new GitTool();
-        try {
-            parser.add(new Option("--root", null, "DIR", "The git root directory", dir(gt::setRoot)));
-            parser.add(new Flag("--help", "h?", "Show help", gt::setHelp, null, true));
-            parser.add(new Flag("--version", "V", "Show program version", gt::setVersion));
-            parser.add(new Flag("--verbose", null, "Show verbose exceptions", gt::setVerbose, null, true));
 
-            SubCommandSet<Command> subCommandSet = new SubCommandSet<>("cmd", "", gt::setCommand);
-            subCommandSet.add(new SubCommand<>("help", "Show help", false, () -> new Help(subCommandSet, parser), Command::makeParser, "h"));
-            subCommandSet.add(new SubCommand<>("branch", "Change and manage branches", false, () -> new Branch(parser), Command::makeParser, "b", "br"));
-            parser.add(subCommandSet);
+        parser.add(new Option("--git_repository", null, "DIR", "The git repository root directory", dir(this::setRepositoryRoot)));
+        parser.add(new Flag("--help", "h?", "Show help", this::setHelp, null, true));
+        parser.add(new Flag("--version", "V", "Show program version", this::setVersion));
+        parser.add(new Flag("--verbose", null, "Show verbose exceptions", this::setVerbose, null, true));
+
+        subCommandSet = new SubCommandSet<>("cmd", "", this::setCommand);
+        subCommandSet.add(new SubCommand<>("help", "Show help", false, () -> new Help(subCommandSet, parser), Command::makeParser, "h"));
+        subCommandSet.add(new SubCommand<>("branch", "Change and manage branches", false, () -> new Branch(parser), Command::makeParser, "b", "br"));
+        subCommandSet.add(new SubCommand<>("status", "Review branch status", false, () -> new Status(parser), Command::makeParser, "st"));
+        parser.add(subCommandSet);
+
+        return parser;
+    }
+
+    private static final String MASTER = "master";
+
+    public String getDefaultBranch() {
+        String tmp = repository.getConfig().getString("default", null, "branch");
+        if (tmp != null) {
+            return tmp;
+        }
+        return MASTER;
+    }
+
+    public String getDiffbase(String branch) {
+        String tmp = repository.getConfig().getString("branch", branch, "diffbase");
+        if (tmp != null) {
+            return tmp;
+        }
+        return getDefaultBranch();
+    }
+
+    public static void main(String... args) {
+        Locale.setDefault(Locale.US);  // just for the record.
+
+        GitTool gt = new GitTool();
+        ArgumentParser parser = gt.makeParser();
+
+        try {
             parser.parse(args);
 
             if (gt.showVersion()) {
@@ -112,11 +162,11 @@ public class GitTool {
                 System.out.println();
                 System.out.println("Available Commands:");
                 System.out.println();
-                subCommandSet.printUsage(System.out);
+                gt.getSubCommandSet().printUsage(System.out);
                 return;
             }
 
-            gt.execute();
+            gt.command.execute(gt);
             return;
         } catch (ArgumentException e) {
             System.err.println("Argument Error: " + e.getMessage());
@@ -128,23 +178,20 @@ public class GitTool {
                 System.err.println();
                 e.printStackTrace();
             }
-        } catch (IOException e) {
-            System.err.println("IO Error: " + e.getMessage());
+        } catch (IOException | UncheckedIOException e) {
+            System.err.println("I/O Error: " + e.getMessage());
             if (gt.verbose) {
                 System.err.println();
                 e.printStackTrace();
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            System.err.println("Unhandled exception: " + e.getMessage());
+            if (gt.verbose) {
+                System.err.println();
+                e.printStackTrace();
+            }
         }
+
         System.exit(1);
-    }
-
-    private boolean showVersion() {
-        return version;
-    }
-
-    private void execute() throws Exception {
-        command.execute(this);
     }
 }

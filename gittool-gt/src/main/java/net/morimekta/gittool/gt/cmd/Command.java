@@ -16,12 +16,22 @@
 package net.morimekta.gittool.gt.cmd;
 
 import net.morimekta.console.args.ArgumentParser;
+import net.morimekta.console.chr.Color;
 import net.morimekta.gittool.gt.GitTool;
 
 /**
  * Base class for all commands.
  */
 public abstract class Command {
+    static final Color WARN = new Color(Color.YELLOW, Color.BOLD);
+    static final Color ERRO = new Color(Color.RED, Color.BOLD);
+
+    static final Color CLR_UPDATED_BRANCH = new Color(Color.YELLOW, Color.BOLD);
+    static final Color CLR_BASE_BRANCH    = new Color(Color.YELLOW, Color.DIM);
+
+    static final Color CLR_ADDS = new Color(Color.GREEN, Color.BOLD);
+    static final Color CLR_SUBS = new Color(Color.RED, Color.BOLD);
+
     private final ArgumentParser parent;
 
     Command(ArgumentParser parent) {
