@@ -57,6 +57,12 @@ public class GitTool {
     private File       repositoryRoot = null;
     private Repository repository     = null;
 
+    private Runtime runtime;
+
+    protected GitTool(Runtime runtime) {
+        this.runtime = runtime;
+    }
+
     private void setRepositoryRoot(File git_root) {
         this.repositoryRoot = git_root;
     }
@@ -188,19 +194,22 @@ public class GitTool {
         }
     }
 
-    public static void main(String... args) {
+    public Runtime getRuntime() {
+        return runtime;
+    }
+
+    public void execute(String... args) {
         Locale.setDefault(Locale.US);  // just for the record.
 
-        GitTool gt = new GitTool();
-        ArgumentParser parser = gt.makeParser();
+        ArgumentParser parser = makeParser();
 
         try {
             parser.parse(args);
 
-            if (gt.showVersion()) {
+            if (showVersion()) {
                 System.out.println(parser.getVersion());
                 return;
-            } else if (gt.showHelp()) {
+            } else if (showHelp()) {
                 System.out.println(parser.getProgramDescription());
                 System.out.println("Usage: " + parser.getSingleLineUsage());
                 System.out.println();
@@ -208,11 +217,11 @@ public class GitTool {
                 System.out.println();
                 System.out.println("Available Commands:");
                 System.out.println();
-                gt.getSubCommandSet().printUsage(System.out);
+                getSubCommandSet().printUsage(System.out);
                 return;
             }
 
-            gt.command.execute(gt);
+            command.execute(this);
             return;
         } catch (ArgumentException e) {
             System.err.println("Argument Error: " + e.getMessage());
@@ -220,30 +229,38 @@ public class GitTool {
             System.err.println("Usage: " + parser.getSingleLineUsage());
             System.err.println();
             parser.printUsage(System.err);
-            if (gt.verbose) {
+            if (verbose) {
                 System.err.println();
                 e.printStackTrace();
             }
         } catch (GitAPIException e) {
             System.err.println("Git Error: " + e.getMessage());
-            if (gt.verbose) {
+            if (verbose) {
                 System.err.println();
                 e.printStackTrace();
             }
         } catch (IOException | UncheckedIOException e) {
             System.err.println("I/O Error: " + e.getMessage());
-            if (gt.verbose) {
+            if (verbose) {
                 System.err.println();
                 e.printStackTrace();
             }
         } catch (Exception e) {
             System.err.println("Internal Error: " + e.getMessage());
-            if (gt.verbose) {
+            if (verbose) {
                 System.err.println();
                 e.printStackTrace();
             }
         }
 
-        System.exit(1);
+        exit(1);
+    }
+
+    protected void exit(int i) {
+        System.exit(i);
+    }
+
+    public static void main(String... args) {
+        new GitTool(Runtime.getRuntime()).execute(args);
     }
 }
