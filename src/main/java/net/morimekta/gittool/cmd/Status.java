@@ -142,7 +142,7 @@ public class Status extends Command {
             if (!currentHead.equals(diffWithHead)) {
                 String stats = "";
                 String diff = gt.isRemote(diffWithBranch)
-                              ? format("[->%s%s%s]", DIM, diffWithBranch, CLEAR)
+                              ? format("[->%s%s%s] ", DIM, diffWithBranch, CLEAR)
                               : format("[d:%s%s%s] ", CLR_BASE_BRANCH, diffWithBranch, CLEAR);
 
                 List<RevCommit> localCommits = ImmutableList.copyOf(git.log().addRange(diffWithHead, currentHead).call());
@@ -164,12 +164,12 @@ public class Status extends Command {
                                        .call()));
                     ancestor = sub2.get(0);
                 } else {
-                    ancestor = gt.commitOf(repository, diffWithBranch).orElseThrow(() -> new IOException("No commit in " + diffWithBranch));
+                    ancestor = gt.commitOf(repository, diffWithBranch).orElseThrow(() -> new IOException("No commit on " + diffWithBranch));
                 }
                 if (localCommits.size() > 0) {
                     local = localCommits.get(localCommits.size() - 1);
                 } else {
-                    local = gt.commitOf(repository, currentBranch).orElseThrow(() -> new IOException("No commit in " + currentBranch));
+                    local = gt.commitOf(repository, currentBranch).orElseThrow(() -> new IOException("No commit on " + currentBranch));
                 }
 
                 if (commits > 0 || missing > 0) {
@@ -248,7 +248,7 @@ public class Status extends Command {
 
                 if (staged.size() > 0 || unstaged.size() > 0) {
                     System.out.println();
-                    System.out.println(format("%sUncommitted%s changes in %s%s%s:", RED, CLEAR, CLR_UPDATED_BRANCH, currentBranch, CLEAR));
+                    System.out.println(format("%sUncommitted%s changes on %s%s%s:", RED, CLEAR, CLR_UPDATED_BRANCH, currentBranch, CLEAR));
 
                     Map<String, FileStatus> st = unstaged.stream()
                                                          .map(d -> new FileStatus(relative, root, d))
