@@ -361,7 +361,7 @@
                 <executions>
                     <execution>
                         <id>create-gittool-assembly</id>
-                        <phase>generate-sources</phase>
+                        <phase>package</phase>
                         <goals>
                             <goal>single</goal>
                         </goals>
