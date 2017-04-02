@@ -1,15 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
-
-    <name>Git-Tool</name>
-    <description>
-        Various tools to usage with git repository management.
-    </description>
     <groupId>net.morimekta.gittool</groupId>
     <artifactId>gittool</artifactId>
     <version>2.0-SNAPSHOT</version>
-    <packaging>pom</packaging>
+    <packaging>jar</packaging>
+
+    <name>Git-Tool</name>
+    <description>
+        gt - or short for Git-Tool is a git branch management helper tool.
+    </description>
 
     <url>http://www.morimekta.net/gittool</url>
     <licenses>
@@ -66,20 +68,15 @@
         <!-- testing versions -->
         <junit.version>4.12</junit.version>
         <hamcrest.version>1.3</hamcrest.version>
-        <mockito.version>1.10.19</mockito.version>
+        <mockito.version>2.7.21</mockito.version>
         <jacoco.version>0.7.6.201602180812</jacoco.version>
 
         <!-- library versions -->
+        <slf4j.version>1.7.25</slf4j.version>
         <guava.version>21.0</guava.version>
-        <jgit.version>4.1.1.201511131810-r</jgit.version>
-        <morimekta_utils.version>0.4.4</morimekta_utils.version>
+        <jgit.version>4.6.1.201703071140-r</jgit.version>
+        <morimekta_utils.version>0.4.5</morimekta_utils.version>
     </properties>
-
-    <modules>
-        <module>gittool-common</module>
-        <module>gittool-gt</module>
-        <module>gittool-package</module>
-    </modules>
 
     <dependencyManagement>
         <dependencies>
@@ -117,12 +114,28 @@
             <dependency>
                 <groupId>org.slf4j</groupId>
                 <artifactId>slf4j-api</artifactId>
-                <version>1.7.21</version>
+                <version>${slf4j.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.slf4j</groupId>
-                <artifactId>slf4j-simple</artifactId>
-                <version>1.7.21</version>
+                <artifactId>slf4j-nop</artifactId>
+                <version>${slf4j.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.slf4j</groupId>
+                <artifactId>jcl-over-slf4j</artifactId>
+                <version>${slf4j.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.httpcomponents</groupId>
+                <artifactId>httpclient</artifactId>
+                <version>4.5.3</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>commons-logging</groupId>
+                        <artifactId>commons-logging</artifactId>
+                    </exclusion>
+                </exclusions>
             </dependency>
 
             <!-- test deps -->
@@ -149,7 +162,50 @@
         </dependencies>
     </dependencyManagement>
 
+    <dependencies>
+        <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.eclipse.jgit</groupId>
+            <artifactId>org.eclipse.jgit</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>net.morimekta.utils</groupId>
+            <artifactId>console-util</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-nop</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>jcl-over-slf4j</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
     <build>
+        <finalName>gittool</finalName>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>true</filtering>
+            </resource>
+        </resources>
+
         <pluginManagement>
             <plugins>
                 <plugin>
@@ -251,6 +307,184 @@
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>2.4.3</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <minimizeJar>true</minimizeJar>
+                            <createDependencyReducedPom>false</createDependencyReducedPom>
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <!-- The accompanied license and notice is not from this project. -->
+                                        <exclude>META-INF/LICENSE</exclude>
+                                        <exclude>META-INF/NOTICE</exclude>
+                                        <exclude>META-INF/DEPENDENCIES</exclude>
+                                        <exclude>META-INF/maven/</exclude>
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                        <exclude>META-INF/maven/**</exclude>
+                                        <exclude>**/package.html</exclude>
+                                        <exclude>**/overview.html</exclude>
+                                        <exclude>**/pom.xml</exclude>
+                                        <exclude>**/pom.properties</exclude>
+                                        <exclude>about.html</exclude>
+                                        <exclude>plugin.properties</exclude>
+                                    </excludes>
+                                </filter>
+                                <filter>
+                                    <artifact>org.slf4j:*</artifact>
+                                    <includes>
+                                        <include>org/slf4j/**</include>
+                                    </includes>
+                                </filter>
+                            </filters>
+                            <transformers>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                    <mainClass>net.morimekta.gittool.GitTool</mainClass>
+                                </transformer>
+                            </transformers>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-assembly-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>create-gittool-assembly</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>single</goal>
+                        </goals>
+                        <configuration>
+                            <descriptors>
+                                <descriptor>src/assembly/gittool.xml</descriptor>
+                            </descriptors>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.vafer</groupId>
+                <artifactId>jdeb</artifactId>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>jdeb</goal>
+                        </goals>
+                        <configuration>
+                            <skip>${disable.distribution.packaging}</skip>
+                            <deb>[[buildDir]]/gittool-[[version]]_all.[[extension]]</deb>
+                            <verbose>true</verbose>
+                            <snapshotExpand>true</snapshotExpand>
+                            <snapshotEnv>USER</snapshotEnv>
+
+                            <dataSet>
+                                <data>
+                                    <src>${project.basedir}/src/deb/bin/gt</src>
+                                    <type>file</type>
+                                    <mapper>
+                                        <type>perm</type>
+                                        <prefix>/usr/local/bin</prefix>
+                                        <filemode>755</filemode>
+                                    </mapper>
+                                </data>
+                                <data>
+                                    <src>${project.basedir}/src/deb/bin/gittool</src>
+                                    <type>file</type>
+                                    <mapper>
+                                        <type>perm</type>
+                                        <prefix>/usr/local/bin</prefix>
+                                        <filemode>755</filemode>
+                                    </mapper>
+                                </data>
+                                <data>
+                                    <src>${project.basedir}/src/deb/share/diffall.vim</src>
+                                    <type>file</type>
+                                    <mapper>
+                                        <type>perm</type>
+                                        <prefix>/usr/local/share/gittool</prefix>
+                                    </mapper>
+                                </data>
+                                <data>
+                                    <src>${project.basedir}/target/gittool.jar</src>
+                                    <type>file</type>
+                                    <mapper>
+                                        <type>perm</type>
+                                        <prefix>/usr/local/share/gittool</prefix>
+                                    </mapper>
+                                </data>
+                            </dataSet>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>rpm-maven-plugin</artifactId>
+                <extensions>true</extensions>
+                <executions>
+                    <execution>
+                        <id>attach-rpm</id>
+                        <goals>
+                            <goal>attached-rpm</goal>
+                        </goals>
+                        <configuration>
+                            <!-- identification -->
+                            <disabled>${disable.distribution.packaging}</disabled>
+                            <name>gittool</name>
+                            <description>${project.description}</description>
+                            <version>${project.version}</version>
+                            <license>Apache 2.0</license>
+                            <group>Development/Tools</group>
+
+                            <!-- dependencies -->
+                            <requires>
+                                <require>java &gt;= 1.8</require>
+                            </requires>
+
+                            <!-- mapping -->
+                            <mappings>
+                                <mapping>
+                                    <directory>/usr/local/bin</directory>
+                                    <filemode>755</filemode>
+                                    <username>root</username>
+                                    <sources>
+                                        <source>
+                                            <location>${project.basedir}/src/deb/bin</location>
+                                        </source>
+                                    </sources>
+                                </mapping>
+                                <mapping>
+                                    <directory>/usr/local/share/gittool</directory>
+                                    <filemode>644</filemode>
+                                    <sources>
+                                        <source>
+                                            <location>${project.basedir}/src/deb/share/diffall.vim</location>
+                                        </source>
+                                        <source>
+                                            <location>${project.basedir}/target/gittool.jar</location>
+                                        </source>
+                                    </sources>
+                                </mapping>
+                            </mappings>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-install-plugin</artifactId>
                 <configuration>
                     <skip>true</skip>
@@ -268,7 +502,6 @@
                 <artifactId>maven-release-plugin</artifactId>
                 <configuration>
                     <tagNameFormat>v@{project.version}</tagNameFormat>
-                    <autoVersionSubmodules>true</autoVersionSubmodules>
                 </configuration>
             </plugin>
             <plugin>
