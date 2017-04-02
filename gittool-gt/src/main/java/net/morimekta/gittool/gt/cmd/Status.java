@@ -35,6 +35,8 @@ import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 
 import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZonedDateTime;
@@ -56,7 +58,9 @@ import static net.morimekta.console.chr.Color.YELLOW;
  * Interactively manage branches.
  */
 public class Status extends Command {
-    private static class FileStatus {
+    private String root;
+
+    private class FileStatus {
         DiffEntry staged;
         DiffEntry unstaged;
 
@@ -181,13 +185,13 @@ public class Status extends Command {
                     break;
             }
 
-            builder.append(getNewestPath());
+            builder.append(path(getNewestPath()));
             builder.append(CLEAR);
 
             if (!getNewestPath().equals(getOldestPath())) {
                 builder.append(" <- ");
                 builder.append(DIM);
-                builder.append(getOldestPath());
+                builder.append(path(getOldestPath()));
                 builder.append(CLEAR);
             }
 
@@ -195,9 +199,17 @@ public class Status extends Command {
         }
     }
 
+    private static Path pwd = Paths.get(System.getenv("PWD")).normalize().toAbsolutePath();
+
     private boolean files = false;
     private void setFiles(boolean files) {
         this.files = files;
+    }
+
+    private boolean relative = false;
+    private void setRelative(boolean relative) {
+        this.relative = relative;
+        this.files = true;
     }
 
     private String branch = null;
@@ -214,6 +226,7 @@ public class Status extends Command {
         ArgumentParser parser = new ArgumentParser(getParent().getProgram() + " diff", getParent().getVersion(), "File diff selection.");
         parser.add(new Option("--branch", "b", "NAME", "Show status for branch", this::setBranch, "HEAD"));
         parser.add(new Flag("--files", "f", "Show file listing", this::setFiles));
+        parser.add(new Flag("--relative", "r", "Show relative path to PWD (implies --files)", this::setRelative));
         return parser;
     }
 
@@ -233,6 +246,13 @@ public class Status extends Command {
         }
     }
 
+    private String path(String path) {
+        if (relative) {
+            return pwd.relativize(Paths.get(root, path)).toString();
+        }
+        return path;
+    }
+
     @Override
     public void execute(GitTool gt) throws IOException {
         try (Repository repository = gt.getRepository()) {
@@ -243,10 +263,16 @@ public class Status extends Command {
 
             Git git = new Git(repository);
             String currentBranch = repository.getBranch();
-            String diffWithBranch = gt.getDiffbase(currentBranch);
+            String diffWithBranch = branch != null ? branch : gt.getDiffbase(currentBranch);
+
+            this.root = gt.getRepositoryRoot().getCanonicalFile().getAbsolutePath();
 
             Ref currentRef = repository.getRef(gt.refName(currentBranch));
             Ref diffWithRef = repository.getRef(gt.refName(diffWithBranch));
+            if (diffWithRef == null) {
+                System.out.println(format("No such branch %s%s%s", BOLD, diffWithBranch, CLEAR));
+                return;
+            }
 
             ObjectId currentHead = currentRef.getObjectId();
             ObjectId diffWithHead = diffWithRef.getObjectId();
@@ -317,23 +343,23 @@ public class Status extends Command {
                             case RENAME:
                                 System.out.println(format(" R %s%s%s <- %s%s%s",
                                                           new Color(YELLOW, DIM), entry.getNewPath(), CLEAR,
-                                                          DIM, entry.getOldPath(), CLEAR));
+                                                          DIM, path(entry.getOldPath()), CLEAR));
                                 break;
                             case MODIFY:
-                                System.out.println(format("   %s", entry.getOldPath()));
+                                System.out.println(format("   %s", path(entry.getOldPath())));
                                 break;
                             case ADD:
                                 System.out.println(format(" A %s%s%s",
-                                                          GREEN, entry.getNewPath(), CLEAR));
+                                                          GREEN, path(entry.getNewPath()), CLEAR));
                                 break;
                             case DELETE:
                                 System.out.println(format(" D %s%s%s",
-                                                          YELLOW, entry.getOldPath(), CLEAR));
+                                                          YELLOW, path(entry.getOldPath()), CLEAR));
                                 break;
                             case COPY:
                                 System.out.println(format(" C %s%s%s <- %s%s%s",
-                                                          new Color(YELLOW, DIM), entry.getNewPath(), CLEAR,
-                                                          DIM, entry.getOldPath(), CLEAR));
+                                                          new Color(YELLOW, DIM), path(entry.getNewPath()), CLEAR,
+                                                          DIM, path(entry.getOldPath()), CLEAR));
                                 break;
                         }
                     }
@@ -411,7 +437,7 @@ public class Status extends Command {
                         long dels = staged.stream().filter(e -> e.getChangeType() == DiffEntry.ChangeType.DELETE).count();
                         long mods = staged.size() - adds - dels;
 
-                        System.out.print(format(" - %sStaged files%s   : ", new Color(YELLOW, DIM), CLEAR));
+                        System.out.print(format(" - %sStaged files%s   :", new Color(YELLOW, DIM), CLEAR));
                         if (adds > 0) {
                             System.out.print(format(" %s+%d%s", GREEN, adds, CLEAR));
                         }

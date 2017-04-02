@@ -34,6 +34,7 @@ import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.StoredConfig;
 import org.eclipse.jgit.revwalk.RevCommit;
 
 import java.io.IOException;
@@ -42,7 +43,9 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.stream.Collectors;
 
+import static java.lang.String.format;
 import static net.morimekta.console.chr.Color.BOLD;
 import static net.morimekta.console.chr.Color.CLEAR;
 import static net.morimekta.console.chr.Color.DIM;
@@ -62,8 +65,6 @@ public class Branch extends Command {
         DELETE,
         RENAME,
         SET_DIFFBASE,
-        SET_REMOTE,
-        NEWCL,
     }
 
     private class BranchInfo {
@@ -149,6 +150,18 @@ public class Branch extends Command {
 
             return builder.toString();
         }
+
+        String selectionLine(Color baseColor) {
+            StringBuilder builder = new StringBuilder();
+
+            builder.append(Color.DIM);
+            builder.append(name);
+            builder.append(CLEAR);
+            if (baseColor != null) {
+                builder.append(baseColor);
+            }
+            return builder.toString();
+        }
     }
 
     private List<BranchInfo> branches = new LinkedList<>();
@@ -204,18 +217,8 @@ public class Branch extends Command {
         return InputSelection.Reaction.SELECT;
     }
 
-    private InputSelection.Reaction onSetRemote(BranchInfo ignore1, LinePrinter ignore2) {
-        action = BranchAction.SET_REMOTE;
-        return InputSelection.Reaction.SELECT;
-    }
-
     private InputSelection.Reaction onSetDiffbase(BranchInfo ignore1, LinePrinter ignore2) {
         action = BranchAction.SET_DIFFBASE;
-        return InputSelection.Reaction.SELECT;
-    }
-
-    private InputSelection.Reaction onNewCl(BranchInfo ignore1, LinePrinter ignore2) {
-        action = BranchAction.NEWCL;
         return InputSelection.Reaction.SELECT;
     }
 
@@ -239,13 +242,14 @@ public class Branch extends Command {
     private GitTool gt = null;
     private String prompt = null;
 
-    private void refreshBranchList() throws IOException, GitAPIException {
+    private BranchInfo refreshBranchList(String selected) throws IOException, GitAPIException {
         branches.clear();
 
         ListBranchCommand bl = git.branchList();
         List<Ref> refs = bl.call();
 
         String current = repository.getFullBranch();
+        BranchInfo selectedInfo = null;
 
         prompt = "Manage branches from <untracked>:";
         for (Ref ref : refs) {
@@ -257,7 +261,15 @@ public class Branch extends Command {
                 info.current = true;
                 info.uncommitted = hasUncommitted();
                 currentInfo = info;
-                prompt = "Manage branches from '" + info.name + "':";
+            }
+            if (selected == null) {
+                if (ref.getName().equals(current)) {
+                    selectedInfo = info;
+                }
+            } else {
+                if (info.name.equals(selected)) {
+                    selectedInfo = info;
+                }
             }
 
             info.diffbase = gt.getDiffbase(info.name);
@@ -291,6 +303,7 @@ public class Branch extends Command {
             return l.name.compareTo(r.name);
         };
         branches.sort(comparator);
+        return selectedInfo == null ? currentInfo : selectedInfo;
     }
 
     @Override
@@ -301,9 +314,7 @@ public class Branch extends Command {
         actions.add(new InputSelection.Command<>(Char.CR, "select", this::onSelect, true));
         actions.add(new InputSelection.Command<>('D', "delete", this::onDelete));
         actions.add(new InputSelection.Command<>('q', "quit", this::onExit));
-        actions.add(new InputSelection.Command<>('r', "set remote", this::onSetRemote));
         actions.add(new InputSelection.Command<>('d', "set diffbase", this::onSetDiffbase));
-        actions.add(new InputSelection.Command<>('n', "newcl", this::onNewCl));
         actions.add(new InputSelection.Command<>('m', "move", this::onRename));
 
         STTY tty = new STTY();
@@ -311,8 +322,8 @@ public class Branch extends Command {
             try (Repository repositoryResource = gt.getRepository()) {
                 this.repository = repositoryResource;
                 this.git = new Git(repositoryResource);
-                refreshBranchList();
-                BranchInfo branch = currentInfo;
+                BranchInfo tmp = refreshBranchList(null);
+                prompt = "Manage branches from '" + currentInfo.name + "':";
 
                 while (true) {
                     action = null;
@@ -322,25 +333,26 @@ public class Branch extends Command {
                                                                                     branches,
                                                                                     actions,
                                                                                     BranchInfo::branchLine);
-                        branch = selection.select(branch);
+                        tmp = selection.select(tmp);
                     } catch (UncheckedIOException e) {
                         // Most likely: User interrupted:
                         // <ESC>, <CTRL-C> etc.
                         System.out.println(e.getMessage());
                         return;
                     }
-                    if (branch == null) {
+                    if (tmp == null) {
                         // command action EXIT.
                         return;
                     }
                     if (action == null) {
                         continue;
                     }
+                    final BranchInfo selected = tmp;
 
                     switch (action) {
                         case CHECKOUT: {
                             Ref ref = git.checkout()
-                                         .setName(branch.name)
+                                         .setName(selected.name)
                                          .call();
                             if (ref == null) {
                                 terminal.error("No ref from checkout op...");
@@ -348,20 +360,20 @@ public class Branch extends Command {
                             break;
                         }
                         case DELETE: {
-                            if (branch.commits == 0 || terminal.confirm(
+                            if (selected.commits == 0 || terminal.confirm(
                                     "Do you really want to delete branch " +
-                                    YELLOW + branch.name + CLEAR + " with " +
-                                    GREEN + "+" + branch.commits + CLEAR + " commits?")) {
+                                    YELLOW + selected.name + CLEAR + " with " +
+                                    GREEN + "+" + selected.commits + CLEAR + " commits?")) {
                                 git.branchDelete()
-                                   .setBranchNames(branch.name)
+                                   .setBranchNames(selected.name)
                                    .call();
-                                terminal.info("Deleted branch " + RED + branch.name + CLEAR + "!");
-                                branch = null;
+                                terminal.info("Deleted branch " + RED + selected.name + CLEAR + "!");
+                                tmp = currentInfo;
                             } else {
                                 terminal.info("Delete canceled.");
                                 return;
                             }
-                            refreshBranchList();
+                            tmp = refreshBranchList(tmp.name);
                             terminal.println();
                             break;
                         }
@@ -369,22 +381,22 @@ public class Branch extends Command {
                             String name;
                             try {
                                 InputLine input = new InputLine(terminal,
-                                                                "New name for " + YELLOW + branch.name + CLEAR);
-                                name = input.readLine(branch.name);
+                                                                "New name for " + YELLOW + selected.name + CLEAR);
+                                name = input.readLine(selected.name);
                             } catch (UncheckedIOException e) {
                                 // Most likely user interruption.
                                 terminal.info(e.getMessage());
                                 terminal.println();
                                 break;
                             }
-                            if (branch.name.equals(name)) {
+                            if (selected.name.equals(name)) {
                                 terminal.info("Same same same...");
                                 terminal.println();
                                 break;
                             }
 
                             Ref ref = git.branchRename()
-                                         .setOldName(branch.name)
+                                         .setOldName(selected.name)
                                          .setNewName(name)
                                          .call();
                             if (ref == null) {
@@ -392,7 +404,61 @@ public class Branch extends Command {
                                 return;
                             }
                             terminal.println();
-                            refreshBranchList();
+                            tmp = refreshBranchList(selected.name);
+                            break;
+                        }
+                        case SET_DIFFBASE: {
+                            if (selected.name.equals(gt.getDefaultBranch())) {
+                                // TODO: Replace list with remotes only...
+                                terminal.warn(format("Setting diffbase on %s%s%s branch!", Color.BOLD, selected.name, Color.CLEAR));
+                                terminal.println();
+                                break;
+                            }
+
+                            List<BranchInfo> options = new LinkedList<>(branches)
+                                    .stream()
+                                    .filter(b -> {
+                                        // cannot have self as diffbase
+                                        if (b == selected) return false;
+                                        // avoid circular diffs.
+                                        return !selected.name.equals(b.diffbase);
+                                    })
+                                    .collect(Collectors.toList());
+                            if (options.size() == 0) {
+                                terminal.info("No possible diffbase branches for " + selected.name);
+                                break;
+                            }
+                            terminal.println();
+
+                            ArrayList<InputSelection.Command<BranchInfo>> diffbaseActions = new ArrayList<>(5);
+                            diffbaseActions.add(new InputSelection.Command<>(Char.CR, "select", (br, lp) -> InputSelection.Reaction.SELECT, true));
+                            diffbaseActions.add(new InputSelection.Command<>('c', "clear", (br, lp) -> {
+                                try {
+                                    StoredConfig config = git.getRepository().getConfig();
+                                    config.unset("branch", selected.name, "diffbase");
+                                    config.save();
+                                    return InputSelection.Reaction.EXIT;
+                                } catch (IOException e) {
+                                    throw new RuntimeException(e.getMessage(), e);
+                                }
+                            }));
+                            diffbaseActions.add(new InputSelection.Command<>('q', "quit", (br, lp) -> InputSelection.Reaction.EXIT));
+
+                            InputSelection<BranchInfo> selection = new InputSelection<>(terminal,
+                                                                                        "Select diffbase for '" + selected.name + "':",
+                                                                                        options,
+                                                                                        diffbaseActions,
+                                                                                        BranchInfo::selectionLine);
+                            BranchInfo oldDiffbase = branches.stream().filter(b -> b.name.equals(selected.diffbase)).findFirst().orElse(null);
+                            BranchInfo newDiffbase = selection.select(oldDiffbase);
+                            if (newDiffbase != null) {
+                                StoredConfig config = git.getRepository().getConfig();
+                                config.setString("branch", selected.name, "diffbase", newDiffbase.name);
+                                config.save();
+                                tmp = refreshBranchList(selected.name);
+                            }
+
+                            terminal.println();
                             break;
                         }
                         default: {
