@@ -20,6 +20,7 @@ import net.morimekta.console.args.Flag;
 import net.morimekta.console.args.Option;
 import net.morimekta.console.chr.Color;
 import net.morimekta.gittool.gt.GitTool;
+import net.morimekta.gittool.gt.util.FileStatus;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
@@ -35,7 +36,6 @@ import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 
 import java.io.IOException;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Clock;
 import java.time.Instant;
@@ -53,153 +53,13 @@ import static net.morimekta.console.chr.Color.DIM;
 import static net.morimekta.console.chr.Color.GREEN;
 import static net.morimekta.console.chr.Color.RED;
 import static net.morimekta.console.chr.Color.YELLOW;
+import static net.morimekta.gittool.gt.GitTool.pwd;
 
 /**
  * Interactively manage branches.
  */
 public class Status extends Command {
     private String root;
-
-    private class FileStatus {
-        DiffEntry staged;
-        DiffEntry unstaged;
-
-        FileStatus(DiffEntry un) {
-            this.unstaged = un;
-        }
-
-        DiffEntry.ChangeType getOverallChange() {
-            if (staged == null) {
-                return unstaged.getChangeType();
-            } else if (unstaged == null) {
-                return staged.getChangeType();
-            } else {
-                if (unstaged.getChangeType() == DiffEntry.ChangeType.DELETE) {
-                    return DiffEntry.ChangeType.DELETE;
-                }
-                if (staged.getChangeType() == DiffEntry.ChangeType.ADD) {
-                    return DiffEntry.ChangeType.ADD;
-                }
-                if (getNewestPath().equals(getOldestPath())) {
-                    return DiffEntry.ChangeType.MODIFY;
-                }
-                // With if the file was copies at leat *once*, then i
-                if (staged.getChangeType() == DiffEntry.ChangeType.COPY ||
-                    unstaged.getChangeType() == DiffEntry.ChangeType.COPY) {
-                    return DiffEntry.ChangeType.COPY;
-                }
-                return DiffEntry.ChangeType.RENAME;
-            }
-        }
-
-        String stagedMod() {
-            if (staged == null) {
-                switch (unstaged.getChangeType()) {
-                    case COPY:   return " C";
-                    case DELETE: return " D";
-                    case ADD:    return "??";  // untracked
-                    case RENAME: return " R";
-                    case MODIFY: return " M";
-                    default:     return "  ";
-                }
-            } else if (unstaged == null) {
-                switch (staged.getChangeType()) {
-                    case COPY:   return "C ";
-                    case DELETE: return "D ";
-                    case ADD:    return "A ";
-                    case RENAME: return "R ";
-                    case MODIFY: return "  ";
-                    default:     return "  ";
-                }
-            } else {
-                // both...
-                StringBuilder builder = new StringBuilder();
-                switch (staged.getChangeType()) {
-                    case COPY:   builder.append('C'); break;
-                    case DELETE: builder.append('D'); break;
-                    case ADD:    builder.append('A'); break;
-                    case RENAME: builder.append('R'); break;
-                    case MODIFY: builder.append('M'); break;
-                    default:     builder.append(' '); break;
-                }
-                switch (unstaged.getChangeType()) {
-                    case COPY:   builder.append('C'); break;
-                    case DELETE: builder.append('D'); break;
-                    case ADD:    builder.append('A'); break;
-                    case RENAME: builder.append('R'); break;
-                    case MODIFY: builder.append('M'); break;
-                    default:     builder.append(' '); break;
-                }
-                return builder.toString();
-            }
-        }
-
-        private boolean real(String path) {
-            return path != null && !"/dev/null".equals(path);
-        }
-
-        String getOldestPath() {
-            if (this.staged != null) {
-                if (real(this.staged.getOldPath())) {
-                    return this.staged.getOldPath();
-                }
-                return this.staged.getNewPath();
-            }
-            if (real(this.unstaged.getOldPath())) {
-                return this.unstaged.getOldPath();
-            }
-            return this.unstaged.getNewPath();
-        }
-
-        String getNewestPath() {
-            if (this.unstaged != null) {
-                if (real(this.unstaged.getNewPath())) {
-                    return this.unstaged.getNewPath();
-                }
-                return this.unstaged.getOldPath();
-            }
-            if (real(this.staged.getNewPath())) {
-                return this.staged.getNewPath();
-            }
-            return this.staged.getOldPath();
-        }
-
-        String statusLine() {
-            StringBuilder builder = new StringBuilder();
-            builder.append(stagedMod());
-            builder.append(' ');
-
-            switch (getOverallChange()) {
-                case ADD:
-                    builder.append(new Color(GREEN, BOLD));
-                    break;
-                case DELETE:
-                    builder.append(new Color(RED, BOLD));
-                    break;
-                case RENAME:
-                case COPY:
-                    builder.append(new Color(YELLOW, DIM));
-                    break;
-                case MODIFY:
-                    builder.append(YELLOW);
-                    break;
-            }
-
-            builder.append(path(getNewestPath()));
-            builder.append(CLEAR);
-
-            if (!getNewestPath().equals(getOldestPath())) {
-                builder.append(" <- ");
-                builder.append(DIM);
-                builder.append(path(getOldestPath()));
-                builder.append(CLEAR);
-            }
-
-            return builder.toString();
-        }
-    }
-
-    private static Path pwd = Paths.get(System.getenv("PWD")).normalize().toAbsolutePath();
 
     private boolean files = false;
     private void setFiles(boolean files) {
@@ -390,27 +250,26 @@ public class Status extends Command {
 
                 if (staged.size() > 0 || unstaged.size() > 0) {
                     System.out.println();
-                    System.out.println(format("Uncommitted changes in %s%s%s:", CLR_UPDATED_BRANCH, currentBranch, CLEAR));
+                    System.out.println(format("%sUncommitted%s changes in %s%s%s:", RED, CLEAR, CLR_UPDATED_BRANCH, currentBranch, CLEAR));
 
                     Map<String, FileStatus> st = unstaged.stream()
-                                                       .map(FileStatus::new)
-                                                       .collect(Collectors.toMap(
+                                                         .map(d -> new FileStatus(relative, root, d))
+                                                         .collect(Collectors.toMap(
                             FileStatus::getNewestPath, fs -> fs));
                     staged.forEach(d -> {
                         if (d.getNewPath() != null) {
                             if (st.containsKey(d.getNewPath())) {
-                                st.get(d.getNewPath()).staged = d;
+                                st.get(d.getNewPath()).setStaged(d);
                                 return;
                             }
                         }
                         if (d.getOldPath() != null) {
                             if (st.containsKey(d.getOldPath())) {
-                                st.get(d.getOldPath()).staged = d;
+                                st.get(d.getOldPath()).setStaged(d);
                                 return;
                             }
                         }
-                        FileStatus fs = new FileStatus(null);
-                        fs.staged = d;
+                        FileStatus fs = new FileStatus(relative, root, null).setStaged(d);
 
                         st.put(fs.getNewestPath(), fs);
                     });
@@ -430,7 +289,7 @@ public class Status extends Command {
                                                               .call();
 
                 if (staged.size() > 0 || unstaged.size() > 0) {
-                    System.out.println(format("Uncommitted changes in %s%s%s:", CLR_UPDATED_BRANCH, currentBranch, CLEAR));
+                    System.out.println(format("Uncommitted changes on %s%s%s:", CLR_UPDATED_BRANCH, currentBranch, CLEAR));
 
                     if (staged.size() > 0) {
                         long adds = staged.stream().filter(e -> e.getChangeType() == DiffEntry.ChangeType.ADD).count();

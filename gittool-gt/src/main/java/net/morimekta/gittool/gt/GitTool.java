@@ -39,6 +39,8 @@ import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Locale;
 import java.util.Optional;
 
@@ -46,6 +48,7 @@ import static net.morimekta.console.util.Parser.dir;
 
 public class GitTool {
     private static final String DOT_GIT = ".git";
+    public  static       Path   pwd     = Paths.get(System.getenv("PWD")).normalize().toAbsolutePath();
 
     private SubCommandSet<Command> subCommandSet = null;
 
