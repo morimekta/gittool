@@ -356,8 +356,9 @@ public class Branch extends Command {
                                          .call();
                             if (ref == null) {
                                 terminal.error("No ref from checkout op...");
+                                break;
                             }
-                            break;
+                            return;
                         }
                         case DELETE: {
                             if (selected.commits == 0 || terminal.confirm(
