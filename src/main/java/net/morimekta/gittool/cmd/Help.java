@@ -20,6 +20,9 @@ import net.morimekta.console.args.ArgumentParser;
 import net.morimekta.console.args.SubCommandSet;
 import net.morimekta.gittool.GitTool;
 
+import static net.morimekta.console.chr.Color.BOLD;
+import static net.morimekta.console.chr.Color.CLEAR;
+
 /**
  * The 'usage' sub-command.
  */
@@ -48,9 +51,56 @@ public class Help extends Command {
     @Override
     public void execute(GitTool opts) {
         if (command != null) {
-            System.err.println("Help Command: " + command);
+            System.out.println("Usage: " + subCommandSet.getSingleLineUsage(command));
+            switch (command) {
+                case "branch":
+                    System.out.println();
+                    System.out.println(BOLD + "Show branches and manage them interactively" + CLEAR);
+                    System.out.println();
+                    System.out.println("Possible commands on a branch:");
+                    System.out.println(" - <enter>: Check out branch.");
+                    System.out.println(" - 'd': Set diff base for gt on the branch.");
+                    System.out.println(" - 'm': Move (rename) branch.");
+                    System.out.println(" - 'D': Delete selected branch.");
+                    System.out.println(" - 'q': Exit to console.");
+                    System.out.println();
+                    System.out.println("Branch line legend:");
+                    System.out.println(" 1 * master  <- origin/master -- MOD --");
+                    System.out.println(" 2   develop :d master [+1,-2]");
+                    System.out.println();
+                    System.out.println(" \"1\": The branch index. The default branch is always sorted first");
+                    System.out.println(" \"*\": The asterisk marks the current checked out branch");
+                    System.out.println(" \"<- [remote/branch]\": The branch is tracking this remote");
+                    System.out.println(" \"d: [branch]\": The branch has this diff base");
+                    System.out.println(" \"[+1,-2]\": Commits only on this branch, and only on compared branch");
+                    System.out.println(" \"-- MOD --\": If current branch has uncommitted files");
+                    break;
+                case "status":
+                    System.out.println();
+                    System.out.println(BOLD + "Show current branch status" + CLEAR);
+                    System.out.println();
+                    subCommandSet.printUsage(System.out, command);
+                    break;
+                case "help":
+                    System.out.println();
+                    System.out.println(BOLD + "Show help information" + CLEAR);
+                    subCommandSet.printUsage(System.out, command);
+                    break;
+                default:
+                    System.out.println();
+                    subCommandSet.printUsage(System.out, command);
+                    break;
+            }
         } else {
-            System.err.println("Help (general");
+            ArgumentParser parser = getParent();
+            System.out.println(parser.getProgramDescription());
+            System.out.println("Usage: " + parser.getSingleLineUsage());
+            System.out.println();
+            parser.printUsage(System.out);
+            System.out.println();
+            System.out.println("Available Commands:");
+            System.out.println();
+            subCommandSet.printUsage(System.out);
         }
     }
 }
