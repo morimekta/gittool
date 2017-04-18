@@ -16,16 +16,18 @@
 package net.morimekta.gittool;
 
 import net.morimekta.console.args.ArgumentException;
+import net.morimekta.console.args.ArgumentOptions;
 import net.morimekta.console.args.ArgumentParser;
 import net.morimekta.console.args.Flag;
 import net.morimekta.console.args.Option;
 import net.morimekta.console.args.SubCommand;
 import net.morimekta.console.args.SubCommandSet;
-import net.morimekta.gittool.util.Utils;
+import net.morimekta.console.util.STTY;
 import net.morimekta.gittool.cmd.Branch;
 import net.morimekta.gittool.cmd.Command;
 import net.morimekta.gittool.cmd.Help;
 import net.morimekta.gittool.cmd.Status;
+import net.morimekta.gittool.util.Utils;
 
 import com.google.common.collect.ImmutableList;
 import org.eclipse.jgit.api.errors.GitAPIException;
@@ -42,13 +44,13 @@ import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 
 import static net.morimekta.console.util.Parser.dir;
 
 public class GitTool {
     private static final String DOT_GIT = ".git";
-    public  static       Path   pwd     = Paths.get(System.getenv("PWD")).normalize().toAbsolutePath();
 
     private SubCommandSet<Command> subCommandSet = null;
 
@@ -60,10 +62,16 @@ public class GitTool {
     private File       repositoryRoot = null;
     private Repository repository     = null;
 
-    private Runtime runtime;
+    private final Runtime             runtime;
+    private final STTY                tty;
+    private final Map<String, String> env;
+    public static Path                pwd;
 
-    protected GitTool(Runtime runtime) {
+    protected GitTool(Runtime runtime, STTY tty, Map<String, String> env) {
         this.runtime = runtime;
+        this.tty = tty;
+        this.env = env;
+        pwd = Paths.get(env.get("PWD")).normalize().toAbsolutePath();
     }
 
     private void setRepositoryRoot(File git_root) {
@@ -88,7 +96,7 @@ public class GitTool {
 
     public File getRepositoryRoot() throws IOException {
         if (repositoryRoot == null) {
-            File current = new File(".").getCanonicalFile().getAbsoluteFile();
+            File current = new File(env.get("PWD")).getCanonicalFile().getAbsoluteFile();
             while (!(new File(current, DOT_GIT)).exists()) {
                 current = current.getParentFile();
                 if (current == null) {
@@ -124,7 +132,8 @@ public class GitTool {
     private ArgumentParser makeParser() {
         ArgumentParser parser = new ArgumentParser("gt",
                                                    Utils.versionString(),
-                                                   "Extra git tools by morimekta");
+                                                   "Extra git tools by morimekta",
+                                                   ArgumentOptions.defaults(tty));
 
         parser.add(new Option("--git_repository", null, "DIR", "The git repository root directory", dir(this::setRepositoryRoot)));
         parser.add(new Flag("--help", "h?", "Show help", this::setHelp, null, true));
@@ -264,6 +273,7 @@ public class GitTool {
     }
 
     public static void main(String... args) {
-        new GitTool(Runtime.getRuntime()).execute(args);
+        Runtime runtime = Runtime.getRuntime();
+        new GitTool(runtime, new STTY(runtime), System.getenv()).execute(args);
     }
 }

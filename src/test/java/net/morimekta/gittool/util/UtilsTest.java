@@ -20,8 +20,6 @@
  */
 package net.morimekta.gittool.util;
 
-import net.morimekta.gittool.util.Utils;
-
 import org.junit.Test;
 
 import static java.io.File.separator;
