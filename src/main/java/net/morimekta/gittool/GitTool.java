@@ -23,10 +23,10 @@ import net.morimekta.console.args.Option;
 import net.morimekta.console.args.SubCommand;
 import net.morimekta.console.args.SubCommandSet;
 import net.morimekta.console.util.STTY;
-import net.morimekta.gittool.cmd.Branch;
+import net.morimekta.gittool.cmd.GtBranch;
 import net.morimekta.gittool.cmd.Command;
 import net.morimekta.gittool.cmd.Help;
-import net.morimekta.gittool.cmd.Status;
+import net.morimekta.gittool.cmd.GtStatus;
 import net.morimekta.gittool.util.Utils;
 
 import com.google.common.collect.ImmutableList;
@@ -142,8 +142,8 @@ public class GitTool {
 
         subCommandSet = new SubCommandSet<>("cmd", "", this::setCommand);
         subCommandSet.add(new SubCommand<>("help", "Show help", false, () -> new Help(subCommandSet, parser), Command::makeParser, "h"));
-        subCommandSet.add(new SubCommand<>("branch", "Change and manage branches", false, () -> new Branch(parser), Command::makeParser, "b", "br"));
-        subCommandSet.add(new SubCommand<>("status", "Review branch status", false, () -> new Status(parser), Command::makeParser, "st"));
+        subCommandSet.add(new SubCommand<>("branch", "Change and manage branches", false, () -> new GtBranch(parser), Command::makeParser, "b", "br"));
+        subCommandSet.add(new SubCommand<>("status", "Review branch status", false, () -> new GtStatus(parser), Command::makeParser, "st"));
         parser.add(subCommandSet);
 
         return parser;

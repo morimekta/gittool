@@ -15,14 +15,14 @@
  */
 package net.morimekta.gittool.cmd;
 
-import net.morimekta.console.InputLine;
-import net.morimekta.console.InputSelection;
-import net.morimekta.console.LinePrinter;
-import net.morimekta.console.Terminal;
 import net.morimekta.console.args.ArgumentParser;
 import net.morimekta.console.chr.Char;
 import net.morimekta.console.chr.CharUtil;
 import net.morimekta.console.chr.Color;
+import net.morimekta.console.terminal.InputLine;
+import net.morimekta.console.terminal.InputSelection;
+import net.morimekta.console.terminal.LinePrinter;
+import net.morimekta.console.terminal.Terminal;
 import net.morimekta.console.util.STTY;
 import net.morimekta.gittool.GitTool;
 
@@ -56,7 +56,7 @@ import static net.morimekta.console.chr.Color.YELLOW;
 /**
  * Interactively manage branches.
  */
-public class Branch extends Command {
+public class GtBranch extends Command {
     private int longestBranchName = 0;
     private int longestRemoteName = 0;
 
@@ -166,7 +166,7 @@ public class Branch extends Command {
 
     private List<BranchInfo> branches = new LinkedList<>();
 
-    public Branch(ArgumentParser parent) {
+    public GtBranch(ArgumentParser parent) {
         super(parent);
     }
 
@@ -361,13 +361,31 @@ public class Branch extends Command {
                             return;
                         }
                         case DELETE: {
+                            if (selected.name.equals(gt.getDefaultBranch())) {
+                                terminal.info("Not allowed to delete default branch: " + selected.name);
+                                break;
+                            }
+
                             if (selected.commits == 0 || terminal.confirm(
                                     "Do you really want to delete branch " +
                                     YELLOW + selected.name + CLEAR + " with " +
                                     GREEN + "+" + selected.commits + CLEAR + " commits?")) {
-                                git.branchDelete()
-                                   .setBranchNames(selected.name)
-                                   .call();
+                                try {
+                                    git.branchDelete()
+                                       .setBranchNames(selected.name)
+                                       .call();
+                                } catch (GitAPIException se) {
+                                    terminal.println(se.getMessage());
+                                    if (terminal.confirm("Do you " + BOLD + "really" + CLEAR + " want to delete branch?")) {
+                                        git.branchDelete()
+                                           .setBranchNames(selected.name)
+                                           .setForce(true)
+                                           .call();
+                                    } else {
+                                        terminal.info("Delete canceled.");
+                                        return;
+                                    }
+                                }
                                 terminal.info("Deleted branch " + RED + selected.name + CLEAR + "!");
                                 tmp = currentInfo;
                             } else {

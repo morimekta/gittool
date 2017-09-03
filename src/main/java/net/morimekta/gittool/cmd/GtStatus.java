@@ -58,7 +58,7 @@ import static net.morimekta.gittool.GitTool.pwd;
 /**
  * Interactively manage branches.
  */
-public class Status extends Command {
+public class GtStatus extends Command {
     private String root;
 
     private boolean files = false;
@@ -77,7 +77,7 @@ public class Status extends Command {
         this.branch = branch;
     }
 
-    public Status(ArgumentParser parent) {
+    public GtStatus(ArgumentParser parent) {
         super(parent);
     }
 

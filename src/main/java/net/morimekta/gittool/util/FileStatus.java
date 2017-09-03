@@ -53,7 +53,7 @@ public class FileStatus {
             if (getNewestPath().equals(getOldestPath())) {
                 return DiffEntry.ChangeType.MODIFY;
             }
-            // With if the file was copies at leat *once*, then i
+            // With if the file was copies at least *once*, then it is copied.
             if (staged.getChangeType() == DiffEntry.ChangeType.COPY ||
                 unstaged.getChangeType() == DiffEntry.ChangeType.COPY) {
                 return DiffEntry.ChangeType.COPY;

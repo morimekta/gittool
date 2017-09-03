@@ -75,7 +75,7 @@
         <slf4j.version>1.7.25</slf4j.version>
         <guava.version>21.0</guava.version>
         <jgit.version>4.6.1.201703071140-r</jgit.version>
-        <morimekta_utils.version>0.5.1</morimekta_utils.version>
+        <morimekta_utils.version>2.0.0</morimekta_utils.version>
     </properties>
 
     <dependencyManagement>
