@@ -23,8 +23,6 @@ out/
 out
 
 .idea/*
-.idea/!codeStyleSettings.xml
-!.idea/codeStyleSettings.xml
 *.iml
 
 dependency-reduced-pom.xml
