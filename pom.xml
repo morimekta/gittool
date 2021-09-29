@@ -49,10 +49,6 @@
         <tag>HEAD</tag>
     </scm>
 
-    <prerequisites>
-        <maven>3.3</maven>
-    </prerequisites>
-
     <properties>
         <disable.distribution.packaging>false</disable.distribution.packaging>
 
@@ -72,8 +68,8 @@
         <jacoco.version>0.7.6.201602180812</jacoco.version>
 
         <!-- library versions -->
-        <slf4j.version>1.7.25</slf4j.version>
-        <guava.version>21.0</guava.version>
+        <slf4j.version>1.7.32</slf4j.version>
+        <guava.version>31.0.1-jre</guava.version>
         <jgit.version>4.6.1.201703071140-r</jgit.version>
         <morimekta_utils.version>2.0.0</morimekta_utils.version>
     </properties>
@@ -82,23 +78,23 @@
         <dependencies>
             <dependency>
                 <groupId>net.morimekta.utils</groupId>
-                <artifactId>io-util</artifactId>
-                <version>${morimekta_utils.version}</version>
+                <artifactId>io</artifactId>
+                <version>4.3.0</version>
             </dependency>
             <dependency>
                 <groupId>net.morimekta.utils</groupId>
-                <artifactId>console-util</artifactId>
-                <version>${morimekta_utils.version}</version>
+                <artifactId>terminal</artifactId>
+                <version>4.0.0</version>
             </dependency>
             <dependency>
                 <groupId>net.morimekta.utils</groupId>
-                <artifactId>diff-util</artifactId>
-                <version>${morimekta_utils.version}</version>
+                <artifactId>strings</artifactId>
+                <version>4.3.0</version>
             </dependency>
             <dependency>
                 <groupId>net.morimekta.utils</groupId>
-                <artifactId>testing-util</artifactId>
-                <version>${morimekta_utils.version}</version>
+                <artifactId>testing</artifactId>
+                <version>4.1.0</version>
             </dependency>
 
             <dependency>
@@ -174,7 +170,7 @@
 
         <dependency>
             <groupId>net.morimekta.utils</groupId>
-            <artifactId>console-util</artifactId>
+            <artifactId>terminal</artifactId>
         </dependency>
         <dependency>
             <groupId>org.slf4j</groupId>
@@ -187,7 +183,7 @@
 
         <dependency>
             <groupId>net.morimekta.utils</groupId>
-            <artifactId>testing-util</artifactId>
+            <artifactId>testing</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
