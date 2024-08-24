@@ -466,7 +466,7 @@
                                     <username>root</username>
                                     <sources>
                                         <source>
-                                            <location>${project.basedir}/src/assembly/bin</location>
+                                            <location>${project.basedir}/src/deb/bin</location>
                                         </source>
                                     </sources>
                                 </mapping>

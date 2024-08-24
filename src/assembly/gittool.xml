@@ -8,7 +8,7 @@
     <includeBaseDirectory>false</includeBaseDirectory>
     <fileSets>
         <fileSet>
-            <directory>${project.basedir}/src/assembly/bin</directory>
+            <directory>${project.basedir}/src/deb/bin</directory>
             <includes>
                 <include>*</include>
             </includes>
