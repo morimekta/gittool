@@ -18,14 +18,13 @@ package net.morimekta.gittool;
 import net.morimekta.collect.UnmodifiableList;
 import net.morimekta.gittool.cmd.Command;
 import net.morimekta.gittool.cmd.GtBranch;
+import net.morimekta.gittool.cmd.GtHelp;
 import net.morimekta.gittool.cmd.GtStatus;
-import net.morimekta.gittool.cmd.Help;
 import net.morimekta.gittool.util.Utils;
 import net.morimekta.io.tty.TTY;
 import net.morimekta.terminal.args.ArgException;
 import net.morimekta.terminal.args.ArgHelp;
 import net.morimekta.terminal.args.ArgParser;
-import net.morimekta.terminal.args.SubCommandSet;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Repository;
@@ -51,8 +50,9 @@ import static net.morimekta.terminal.args.ValueParser.dir;
 
 public class GitTool {
     private static final String DOT_GIT = ".git";
+    public final         TTY    tty;
 
-    private SubCommandSet<Command> subCommandSet = null;
+    public ArgParser parser = null;
 
     private Command command = null;
     private boolean help    = false;
@@ -62,13 +62,10 @@ public class GitTool {
     private File       repositoryRoot = null;
     private Repository repository     = null;
 
-    private final Runtime             runtime;
-    private final TTY                 tty;
     private final Map<String, String> env;
     public static Path                pwd;
 
-    protected GitTool(Runtime runtime, TTY tty, Map<String, String> env) {
-        this.runtime = runtime;
+    protected GitTool(TTY tty, Map<String, String> env) {
         this.tty = tty;
         this.env = env;
         pwd = Paths.get(env.get("PWD")).normalize().toAbsolutePath();
@@ -137,8 +134,8 @@ public class GitTool {
                 .add(flag("--version", "V", "Show program version", this::setVersion))
                 .add(flagLong("--verbose", "Show verbose exceptions", this::setVerbose))
                 .withSubCommands("cmd", "", this::setCommand)
-                .add(subCommand("help", "Show help", Help::new).alias("h"))
-                .add(subCommand("branch", "Change branch", GtBranch::new).alias("br", "b"))
+                .add(subCommand("help", "Show help", GtHelp::new).alias("h"))
+                .add(subCommand("branch", "Change branch", parser -> new GtBranch(parser)).alias("br", "b"))
                 .add(subCommand("status", "Review branch status", GtStatus::new).alias("st"))
                 .build();
     }
@@ -203,7 +200,7 @@ public class GitTool {
     public void execute(String... args) {
         Locale.setDefault(Locale.US);  // just for the record.
 
-        ArgParser parser = makeParser();
+        parser = makeParser();
 
         try {
             parser.parse(args);
@@ -246,14 +243,14 @@ public class GitTool {
             }
         }
 
-        exit(1);
+        errorExit();
     }
 
-    protected void exit(int i) {
-        System.exit(i);
+    protected void errorExit() {
+        System.exit(1);
     }
 
     public static void main(String... args) {
-        new GitTool(Runtime.getRuntime(), new TTY(), System.getenv()).execute(args);
+        new GitTool(new TTY(), System.getenv()).execute(args);
     }
 }

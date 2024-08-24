@@ -72,7 +72,11 @@ public class GitToolTest {
 
     @Test
     public void testGT_status1(Console console) {
-        GitTool gt = new GitTool(Runtime.getRuntime(), console.tty(), env);
+        GitTool gt = new GitTool(console.tty(), env) {
+            @Override
+            protected void errorExit() {
+            }
+        };
 
         gt.execute("st");
 
@@ -100,7 +104,11 @@ public class GitToolTest {
 
         git.checkout().setName("other").call();
 
-        GitTool gt = new GitTool(Runtime.getRuntime(), console.tty(), env);
+        GitTool gt = new GitTool(console.tty(), env) {
+            @Override
+            protected void errorExit() {
+            }
+        };
 
         gt.execute("st");
 
@@ -133,7 +141,11 @@ public class GitToolTest {
 
         git.checkout().setName("other").call();
 
-        GitTool gt = new GitTool(Runtime.getRuntime(), console.tty(), env);
+        GitTool gt = new GitTool(console.tty(), env) {
+            @Override
+            protected void errorExit() {
+            }
+        };
 
         gt.execute("st", "-r");
 

@@ -17,7 +17,6 @@ package net.morimekta.gittool.cmd;
 
 import net.morimekta.gittool.GitTool;
 import net.morimekta.terminal.args.ArgParser;
-import net.morimekta.terminal.args.SubCommandSet;
 
 import static net.morimekta.strings.chr.Color.BOLD;
 import static net.morimekta.strings.chr.Color.CLEAR;
@@ -27,16 +26,11 @@ import static net.morimekta.terminal.args.Argument.argument;
 /**
  * The 'usage' sub-command.
  */
-public class Help extends Command {
-    private final ArgParser              parent;
-    private final SubCommandSet<Command> subCommandSet;
-    private       String                 command;
+public class GtHelp extends Command {
+    private String command;
 
-    public Help(ArgParser.Builder builder) {
+    public GtHelp(ArgParser.Builder builder) {
         builder.add(argument("command", "Show help for given command", this::setCommand));
-        var parser = builder.build();
-        this.parent = parser.getParent();
-        this.subCommandSet = parent.getSubCommandSet();
     }
 
     private void setCommand(String s) {
@@ -45,11 +39,14 @@ public class Help extends Command {
 
     @Override
     public void execute(GitTool opts) {
+        var parent = opts.parser;
+        var subCommandSet = parent.getSubCommandSet();
+
         if (command != null) {
             switch (command) {
+                case "b":
+                case "br":
                 case "branch":
-                    System.out.println("Usage: " + subCommandSet.getSingleLineUsage());
-                    System.out.println();
                     System.out.println(BOLD + "Show branches and manage them interactively" + CLEAR);
                     System.out.println();
                     System.out.println("Possible commands on a branch:");
@@ -69,20 +66,19 @@ public class Help extends Command {
                     System.out.println(" \"d: [branch]\": The branch has this diff base");
                     System.out.println(" \"[+1,-2]\": Commits only on this branch, and only on compared branch");
                     System.out.println(" \"-- MOD --\": If current branch has uncommitted files");
-                    break;
-                case "status":
-                    System.out.println("Usage: " + subCommandSet.getSingleLineUsage());
                     System.out.println();
+                    argHelp(subCommandSet.parserForSubCommand("branch")).printHelp(System.out);
+                    break;
+                case "st":
+                case "status":
                     System.out.println(BOLD + "Show current branch status" + CLEAR);
                     System.out.println();
                     argHelp(subCommandSet.parserForSubCommand("status")).printHelp(System.out);
                     break;
                 case "help":
-                    System.out.println("Usage: " + subCommandSet.getSingleLineUsage());
-                    System.out.println();
                     System.out.println(BOLD + "Show help information" + CLEAR);
-                    argHelp(subCommandSet.parserForSubCommand("status"))
-                            .printHelp(System.out);
+                    System.out.println();
+                    argHelp(subCommandSet.parserForSubCommand("help")).printHelp(System.out);
                     break;
                 default:
                     System.err.println("Unknown command: '" + command + "'");

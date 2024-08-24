@@ -19,7 +19,6 @@ import net.morimekta.gittool.GitTool;
 import net.morimekta.io.tty.TTYMode;
 import net.morimekta.strings.chr.Char;
 import net.morimekta.strings.chr.Color;
-import net.morimekta.terminal.LinePrinter;
 import net.morimekta.terminal.Terminal;
 import net.morimekta.terminal.args.ArgParser;
 import net.morimekta.terminal.selection.Selection;
@@ -164,7 +163,7 @@ public class GtBranch extends Command {
 
     private List<BranchInfo> branches = new LinkedList<>();
 
-    public GtBranch(ArgParser.Builder builder) {
+    public GtBranch(ArgParser.Builder ignore) {
     }
 
     private String branchName(Ref ref) {
@@ -183,42 +182,6 @@ public class GtBranch extends Command {
                    .setShowNameAndStatusOnly(true)
                    .setCached(false)
                    .call().isEmpty();
-    }
-
-    private SelectionReaction onSelect(BranchInfo info, LinePrinter printer) {
-        if (info.current) {
-            printer.println("Already on branch " + new Color(YELLOW, DIM) + info.name + CLEAR + "...");
-            return SelectionReaction.EXIT;
-        } else if (currentInfo.uncommitted) {
-            printer.warn("Current branch has uncommitted changes");
-            return SelectionReaction.STAY;
-        } else {
-            action = BranchAction.CHECKOUT;
-            return SelectionReaction.SELECT;
-        }
-    }
-
-    private SelectionReaction onDelete(int idx, BranchInfo info, LinePrinter printer) {
-        if (info.current) {
-            printer.warn("Unable to delete current branch");
-            return SelectionReaction.STAY;
-        }
-        action = BranchAction.DELETE;
-        return SelectionReaction.SELECT;
-    }
-
-    private SelectionReaction onSetDiffbase(int idx, BranchInfo ignore1, LinePrinter ignore2) {
-        action = BranchAction.SET_DIFFBASE;
-        return SelectionReaction.SELECT;
-    }
-
-    private SelectionReaction onRename(int idx, BranchInfo branch, LinePrinter printer) {
-        if (branch.name.equals(gt.getDefaultBranch())) {
-            printer.warn("Not allowed to rename default branch");
-            return SelectionReaction.STAY;
-        }
-        action = BranchAction.RENAME;
-        return SelectionReaction.SELECT;
     }
 
     private BranchInfo   currentInfo = null;
@@ -296,7 +259,7 @@ public class GtBranch extends Command {
     public void execute(GitTool gt) throws IOException {
         this.gt = gt;
 
-        try (Terminal terminal = new Terminal(TTYMode.COOKED)) {
+        try (Terminal terminal = new Terminal(gt.tty, TTYMode.COOKED)) {
             try (Repository repositoryResource = gt.getRepository()) {
                 this.repository = repositoryResource;
                 this.git = new Git(repositoryResource);
@@ -307,6 +270,7 @@ public class GtBranch extends Command {
                     action = null;
                     try (Selection<BranchInfo> selection = Selection
                             .newBuilder(branches)
+                            .tty(terminal.tty())
                             .on(Char.CR, "select", (i, b, sel) -> {
                                 action = BranchAction.CHECKOUT;
                                 return SelectionReaction.SELECT;
@@ -362,6 +326,22 @@ public class GtBranch extends Command {
 
                     switch (action) {
                         case CHECKOUT: {
+                            if (selected.current) {
+                                terminal.lp()
+                                        .println("Already on branch "
+                                                 + new Color(YELLOW, DIM)
+                                                 + currentInfo.name
+                                                 + CLEAR);
+                                return;
+                            } else if (currentInfo.uncommitted) {
+                                terminal.lp()
+                                        .warn("Current branch "
+                                              + new Color(YELLOW, DIM)
+                                              + currentInfo.name
+                                              + CLEAR
+                                              + " has uncommitted changes.");
+                                return;
+                            }
                             Ref ref = git.checkout()
                                          .setName(selected.name)
                                          .call();
@@ -461,6 +441,7 @@ public class GtBranch extends Command {
                             BranchInfo newDiffBase;
                             try (var selection = Selection
                                     .newBuilder(options)
+                                    .tty(terminal.tty())
                                     .prompt("Select diff-base for '" + selected.name + "':")
                                     .on(Char.CR, "select", SelectionReaction.SELECT)
                                     .on('q', "quit", SelectionReaction.EXIT)
