@@ -15,21 +15,17 @@
  */
 package net.morimekta.gittool;
 
-import net.morimekta.console.args.ArgumentException;
-import net.morimekta.console.args.ArgumentOptions;
-import net.morimekta.console.args.ArgumentParser;
-import net.morimekta.console.args.Flag;
-import net.morimekta.console.args.Option;
-import net.morimekta.console.args.SubCommand;
-import net.morimekta.console.args.SubCommandSet;
-import net.morimekta.console.util.STTY;
-import net.morimekta.gittool.cmd.GtBranch;
+import net.morimekta.collect.UnmodifiableList;
 import net.morimekta.gittool.cmd.Command;
-import net.morimekta.gittool.cmd.Help;
+import net.morimekta.gittool.cmd.GtBranch;
 import net.morimekta.gittool.cmd.GtStatus;
+import net.morimekta.gittool.cmd.Help;
 import net.morimekta.gittool.util.Utils;
-
-import com.google.common.collect.ImmutableList;
+import net.morimekta.io.tty.TTY;
+import net.morimekta.terminal.args.ArgException;
+import net.morimekta.terminal.args.ArgHelp;
+import net.morimekta.terminal.args.ArgParser;
+import net.morimekta.terminal.args.SubCommandSet;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Repository;
@@ -47,7 +43,11 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 
-import static net.morimekta.console.util.Parser.dir;
+import static net.morimekta.terminal.args.Flag.flag;
+import static net.morimekta.terminal.args.Flag.flagLong;
+import static net.morimekta.terminal.args.Option.optionLong;
+import static net.morimekta.terminal.args.SubCommand.subCommand;
+import static net.morimekta.terminal.args.ValueParser.dir;
 
 public class GitTool {
     private static final String DOT_GIT = ".git";
@@ -63,19 +63,19 @@ public class GitTool {
     private Repository repository     = null;
 
     private final Runtime             runtime;
-    private final STTY                tty;
+    private final TTY                 tty;
     private final Map<String, String> env;
     public static Path                pwd;
 
-    protected GitTool(Runtime runtime, STTY tty, Map<String, String> env) {
+    protected GitTool(Runtime runtime, TTY tty, Map<String, String> env) {
         this.runtime = runtime;
         this.tty = tty;
         this.env = env;
         pwd = Paths.get(env.get("PWD")).normalize().toAbsolutePath();
     }
 
-    private void setRepositoryRoot(File git_root) {
-        this.repositoryRoot = git_root;
+    private void setRepositoryRoot(Path git_root) {
+        this.repositoryRoot = git_root.toFile();
     }
 
     private void setCommand(Command command) {
@@ -125,28 +125,22 @@ public class GitTool {
         return version && !help;
     }
 
-    private SubCommandSet<Command> getSubCommandSet() {
-        return subCommandSet;
-    }
-
-    private ArgumentParser makeParser() {
-        ArgumentParser parser = new ArgumentParser("gt",
-                                                   Utils.versionString(),
-                                                   "Extra git tools by morimekta",
-                                                   ArgumentOptions.defaults(tty));
-
-        parser.add(new Option("--git_repository", null, "DIR", "The git repository root directory", dir(this::setRepositoryRoot)));
-        parser.add(new Flag("--help", "h?", "Show help", this::setHelp, null, true));
-        parser.add(new Flag("--version", "V", "Show program version", this::setVersion));
-        parser.add(new Flag("--verbose", null, "Show verbose exceptions", this::setVerbose, null, true));
-
-        subCommandSet = new SubCommandSet<>("cmd", "", this::setCommand);
-        subCommandSet.add(new SubCommand<>("help", "Show help", false, () -> new Help(subCommandSet, parser), Command::makeParser, "h"));
-        subCommandSet.add(new SubCommand<>("branch", "Change and manage branches", false, () -> new GtBranch(parser), Command::makeParser, "b", "br"));
-        subCommandSet.add(new SubCommand<>("status", "Review branch status", false, () -> new GtStatus(parser), Command::makeParser, "st"));
-        parser.add(subCommandSet);
-
-        return parser;
+    private ArgParser makeParser() {
+        return ArgParser
+                .argParser("gt",
+                           Utils.versionString(),
+                           "Extra git tools by morimekta")
+                .add(optionLong("--git_repository",
+                                "The git repository root directory",
+                                dir(this::setRepositoryRoot)))
+                .add(flag("--help", "h?", "Show help", this::setHelp))
+                .add(flag("--version", "V", "Show program version", this::setVersion))
+                .add(flagLong("--verbose", "Show verbose exceptions", this::setVerbose))
+                .withSubCommands("cmd", "", this::setCommand)
+                .add(subCommand("help", "Show help", Help::new).alias("h"))
+                .add(subCommand("branch", "Change branch", GtBranch::new).alias("br", "b"))
+                .add(subCommand("status", "Review branch status", GtStatus::new).alias("st"))
+                .build();
     }
 
     private static final String MASTER = "master";
@@ -185,11 +179,11 @@ public class GitTool {
     }
 
     public Optional<RevCommit> commitOf(Repository repository, String branch) throws IOException {
-        try( RevWalk revWalk = new RevWalk(repository) ) {
+        try (RevWalk revWalk = new RevWalk(repository)) {
             ObjectId oid = repository.resolve(refName(branch));
             revWalk.markStart(revWalk.parseCommit(oid));
             revWalk.sort(RevSort.COMMIT_TIME_DESC);
-            return Optional.ofNullable(ImmutableList.copyOf(revWalk).get(0));
+            return Optional.ofNullable(UnmodifiableList.asList(revWalk).get(0));
         }
     }
 
@@ -206,14 +200,10 @@ public class GitTool {
         }
     }
 
-    public Runtime getRuntime() {
-        return runtime;
-    }
-
     public void execute(String... args) {
         Locale.setDefault(Locale.US);  // just for the record.
 
-        ArgumentParser parser = makeParser();
+        ArgParser parser = makeParser();
 
         try {
             parser.parse(args);
@@ -222,46 +212,37 @@ public class GitTool {
                 System.out.println(parser.getVersion());
                 return;
             } else if (showHelp()) {
-                System.out.println(parser.getProgramDescription());
-                System.out.println("Usage: " + parser.getSingleLineUsage());
-                System.out.println();
-                parser.printUsage(System.out);
-                System.out.println();
-                System.out.println("Available Commands:");
-                System.out.println();
-                getSubCommandSet().printUsage(System.out);
+                ArgHelp.argHelp(parser).printHelp(System.out);
                 return;
             }
 
             command.execute(this);
             return;
-        } catch (ArgumentException e) {
+        } catch (ArgException e) {
             System.err.println("Argument Error: " + e.getMessage());
             System.err.println();
-            System.err.println("Usage: " + parser.getSingleLineUsage());
-            System.err.println();
-            parser.printUsage(System.err);
+            ArgHelp.argHelp(parser).printHelp(System.err);
             if (verbose) {
                 System.err.println();
-                e.printStackTrace();
+                e.printStackTrace(System.err);
             }
         } catch (GitAPIException e) {
             System.err.println("Git Error: " + e.getMessage());
             if (verbose) {
                 System.err.println();
-                e.printStackTrace();
+                e.printStackTrace(System.err);
             }
         } catch (IOException | UncheckedIOException e) {
             System.err.println("I/O Error: " + e.getMessage());
             if (verbose) {
                 System.err.println();
-                e.printStackTrace();
+                e.printStackTrace(System.err);
             }
         } catch (Exception e) {
             System.err.println("Internal Error: " + e.getMessage());
             if (verbose) {
                 System.err.println();
-                e.printStackTrace();
+                e.printStackTrace(System.err);
             }
         }
 
@@ -273,7 +254,6 @@ public class GitTool {
     }
 
     public static void main(String... args) {
-        Runtime runtime = Runtime.getRuntime();
-        new GitTool(runtime, new STTY(runtime), System.getenv()).execute(args);
+        new GitTool(Runtime.getRuntime(), new TTY(), System.getenv()).execute(args);
     }
 }

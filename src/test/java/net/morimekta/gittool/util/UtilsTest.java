@@ -20,14 +20,14 @@
  */
 package net.morimekta.gittool.util;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import static java.io.File.separator;
 import static org.hamcrest.CoreMatchers.endsWith;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.notNullValue;
 import static org.hamcrest.CoreMatchers.startsWith;
-import static org.junit.Assert.assertThat;
+import static org.hamcrest.MatcherAssert.assertThat;
 
 public class UtilsTest {
     @Test

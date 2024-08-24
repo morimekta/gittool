@@ -1,28 +1,27 @@
 package net.morimekta.gittool.util;
 
-import net.morimekta.console.chr.Color;
-
+import net.morimekta.strings.chr.Color;
 import org.eclipse.jgit.diff.DiffEntry;
 
 import java.nio.file.Paths;
 
-import static net.morimekta.console.chr.Color.BOLD;
-import static net.morimekta.console.chr.Color.CLEAR;
-import static net.morimekta.console.chr.Color.DIM;
-import static net.morimekta.console.chr.Color.GREEN;
-import static net.morimekta.console.chr.Color.RED;
-import static net.morimekta.console.chr.Color.YELLOW;
 import static net.morimekta.gittool.GitTool.pwd;
+import static net.morimekta.strings.chr.Color.BOLD;
+import static net.morimekta.strings.chr.Color.CLEAR;
+import static net.morimekta.strings.chr.Color.DIM;
+import static net.morimekta.strings.chr.Color.GREEN;
+import static net.morimekta.strings.chr.Color.RED;
+import static net.morimekta.strings.chr.Color.YELLOW;
 
 /**
  * The status of a single change in diff.
- *
+ * <p>
  * - staged git
  * - unstaged git
  */
 public class FileStatus {
-    private final String    root;
-    private final boolean   relative;
+    private final String  root;
+    private final boolean relative;
 
     private DiffEntry staged;
     private DiffEntry unstaged;
@@ -64,80 +63,35 @@ public class FileStatus {
 
     public String stagedMod() {
         if (staged == null) {
-            switch (unstaged.getChangeType()) {
-                case COPY:
-                    return " C";
-                case DELETE:
-                    return " D";
-                case ADD:
-                    return "??";  // untracked
-                case RENAME:
-                    return " R";
-                case MODIFY:
-                    return " M";
-                default:
-                    return "  ";
-            }
+            return switch (unstaged.getChangeType()) {
+                case COPY -> " C";
+                case DELETE -> " D";
+                case ADD -> "??";  // untracked
+                case RENAME -> " R";
+                case MODIFY -> " M";
+            };
         } else if (unstaged == null) {
-            switch (staged.getChangeType()) {
-                case COPY:
-                    return "C ";
-                case DELETE:
-                    return "D ";
-                case ADD:
-                    return "A ";
-                case RENAME:
-                    return "R ";
-                case MODIFY:
-                    return "  ";
-                default:
-                    return "  ";
-            }
+            return switch (staged.getChangeType()) {
+                case COPY -> "C ";
+                case DELETE -> "D ";
+                case ADD -> "A ";
+                case RENAME -> "R ";
+                case MODIFY -> "  ";
+            };
         } else {
-            // both...
-            StringBuilder builder = new StringBuilder();
-            switch (staged.getChangeType()) {
-                case COPY:
-                    builder.append('C');
-                    break;
-                case DELETE:
-                    builder.append('D');
-                    break;
-                case ADD:
-                    builder.append('A');
-                    break;
-                case RENAME:
-                    builder.append('R');
-                    break;
-                case MODIFY:
-                    builder.append('M');
-                    break;
-                default:
-                    builder.append(' ');
-                    break;
-            }
-            switch (unstaged.getChangeType()) {
-                case COPY:
-                    builder.append('C');
-                    break;
-                case DELETE:
-                    builder.append('D');
-                    break;
-                case ADD:
-                    builder.append('A');
-                    break;
-                case RENAME:
-                    builder.append('R');
-                    break;
-                case MODIFY:
-                    builder.append('M');
-                    break;
-                default:
-                    builder.append(' ');
-                    break;
-            }
-            return builder.toString();
+            return "" + stageChangeLetter(staged.getChangeType())
+                   + stageChangeLetter(unstaged.getChangeType());
         }
+    }
+
+    private char stageChangeLetter(DiffEntry.ChangeType unstaged) {
+        return switch (unstaged) {
+            case COPY -> 'C';
+            case DELETE -> 'D';
+            case ADD -> 'A';
+            case RENAME -> 'R';
+            case MODIFY -> 'M';
+        };
     }
 
     private static boolean notNullPath(String path) {

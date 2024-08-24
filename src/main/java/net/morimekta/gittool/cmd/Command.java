@@ -15,9 +15,8 @@
  */
 package net.morimekta.gittool.cmd;
 
-import net.morimekta.console.args.ArgumentParser;
-import net.morimekta.console.chr.Color;
 import net.morimekta.gittool.GitTool;
+import net.morimekta.strings.chr.Color;
 
 /**
  * Base class for all commands.
@@ -32,26 +31,11 @@ public abstract class Command {
     static final Color CLR_ADDS = new Color(Color.GREEN, Color.BOLD);
     static final Color CLR_SUBS = new Color(Color.RED, Color.BOLD);
 
-    private final ArgumentParser parent;
-
-    Command(ArgumentParser parent) {
-        this.parent = parent;
-    }
-
-    /**
-     * Make argument parser for the command.
-     * @return The commands argument parser.
-     */
-    public abstract ArgumentParser makeParser();
-
     /**
      * Execute command with the main GitTool options op.
+     *
      * @param opts The main gittool options.
      * @throws Exception
      */
     public abstract void execute(GitTool opts) throws Exception;
-
-    protected ArgumentParser getParent() {
-        return parent;
-    }
 }

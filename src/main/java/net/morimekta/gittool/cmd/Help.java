@@ -15,33 +15,28 @@
  */
 package net.morimekta.gittool.cmd;
 
-import net.morimekta.console.args.Argument;
-import net.morimekta.console.args.ArgumentParser;
-import net.morimekta.console.args.SubCommandSet;
 import net.morimekta.gittool.GitTool;
+import net.morimekta.terminal.args.ArgParser;
+import net.morimekta.terminal.args.SubCommandSet;
 
-import static net.morimekta.console.chr.Color.BOLD;
-import static net.morimekta.console.chr.Color.CLEAR;
+import static net.morimekta.strings.chr.Color.BOLD;
+import static net.morimekta.strings.chr.Color.CLEAR;
+import static net.morimekta.terminal.args.ArgHelp.argHelp;
+import static net.morimekta.terminal.args.Argument.argument;
 
 /**
  * The 'usage' sub-command.
  */
 public class Help extends Command {
+    private final ArgParser              parent;
     private final SubCommandSet<Command> subCommandSet;
-    private String command;
+    private       String                 command;
 
-    public Help(SubCommandSet<Command> subCommandSet, ArgumentParser parent) {
-        super(parent);
-        this.subCommandSet = subCommandSet;
-    }
-
-    @Override
-    public ArgumentParser makeParser() {
-        ArgumentParser parser = new ArgumentParser(getParent().getProgram() + " help", getParent().getVersion(), "Shows help.");
-
-        parser.add(new Argument("command", "Show help for given command", this::setCommand));
-
-        return parser;
+    public Help(ArgParser.Builder builder) {
+        builder.add(argument("command", "Show help for given command", this::setCommand));
+        var parser = builder.build();
+        this.parent = parser.getParent();
+        this.subCommandSet = parent.getSubCommandSet();
     }
 
     private void setCommand(String s) {
@@ -51,9 +46,9 @@ public class Help extends Command {
     @Override
     public void execute(GitTool opts) {
         if (command != null) {
-            System.out.println("Usage: " + subCommandSet.getSingleLineUsage(command));
             switch (command) {
                 case "branch":
+                    System.out.println("Usage: " + subCommandSet.getSingleLineUsage());
                     System.out.println();
                     System.out.println(BOLD + "Show branches and manage them interactively" + CLEAR);
                     System.out.println();
@@ -76,31 +71,33 @@ public class Help extends Command {
                     System.out.println(" \"-- MOD --\": If current branch has uncommitted files");
                     break;
                 case "status":
+                    System.out.println("Usage: " + subCommandSet.getSingleLineUsage());
                     System.out.println();
                     System.out.println(BOLD + "Show current branch status" + CLEAR);
                     System.out.println();
-                    subCommandSet.printUsage(System.out, command);
+                    argHelp(subCommandSet.parserForSubCommand("status")).printHelp(System.out);
                     break;
                 case "help":
+                    System.out.println("Usage: " + subCommandSet.getSingleLineUsage());
                     System.out.println();
                     System.out.println(BOLD + "Show help information" + CLEAR);
-                    subCommandSet.printUsage(System.out, command);
+                    argHelp(subCommandSet.parserForSubCommand("status"))
+                            .printHelp(System.out);
                     break;
                 default:
-                    System.out.println();
-                    subCommandSet.printUsage(System.out, command);
+                    System.err.println("Unknown command: '" + command + "'");
+                    System.err.println();
+                    argHelp(parent).showHidden(false)
+                                   .showSubCommands(true)
+                                   .showHiddenSubCommands(true)
+                                   .printHelp(System.err);
                     break;
             }
         } else {
-            ArgumentParser parser = getParent();
-            System.out.println(parser.getProgramDescription());
-            System.out.println("Usage: " + parser.getSingleLineUsage());
-            System.out.println();
-            parser.printUsage(System.out);
-            System.out.println();
-            System.out.println("Available Commands:");
-            System.out.println();
-            subCommandSet.printUsage(System.out);
+            argHelp(parent)
+                    .showHidden(false)
+                    .showSubCommands(true)
+                    .printHelp(System.out);
         }
     }
 }

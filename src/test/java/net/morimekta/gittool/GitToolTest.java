@@ -20,53 +20,58 @@
  */
 package net.morimekta.gittool;
 
-import net.morimekta.testing.rules.ConsoleWatcher;
-
+import net.morimekta.testing.console.Console;
+import net.morimekta.testing.junit5.ConsoleExtension;
+import net.morimekta.testing.junit5.ConsoleSize;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.io.TempDir;
 
-import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.HashMap;
 import java.util.Map;
 
-import static net.morimekta.console.chr.CharUtil.stripNonPrintable;
-import static net.morimekta.testing.ResourceUtils.writeContentTo;
+import static java.nio.file.Files.writeString;
+import static net.morimekta.file.FileUtil.readCanonicalPath;
+import static net.morimekta.strings.StringUtil.stripNonPrintable;
 import static org.hamcrest.CoreMatchers.is;
-import static org.junit.Assert.assertThat;
+import static org.hamcrest.MatcherAssert.assertThat;
 
+@ExtendWith(ConsoleExtension.class)
+@ConsoleSize(rows = 44, cols = 128)
 public class GitToolTest {
-    @Rule
-    public TemporaryFolder tmp = new TemporaryFolder();
+    private Path                root;
+    private Map<String, String> env;
+    private Git                 git;
 
-    @Rule
-    public ConsoleWatcher console = new ConsoleWatcher()
-            .withTerminalSize(44, 128);
-
-    private File               root;
-    private Map<String,String> env;
-    private Git                git;
-
-    @Before
-    public void setUp() throws IOException, GitAPIException {
-        root = tmp.newFolder("repo");
+    @BeforeEach
+    public void setUp(@TempDir Path tmp) throws IOException, GitAPIException {
+        root = tmp;
         env = new HashMap<>();
         env.putAll(System.getenv());
-        env.put("PWD", root.getCanonicalFile().getAbsolutePath());
+        env.put("PWD", readCanonicalPath(root).toString());
 
-        git = Git.init().setDirectory(root).call();
-        writeContentTo("a", new File(root, "a.txt"));
+        git = Git.init()
+                 .setDirectory(root.toFile())
+                 .setInitialBranch("master")
+                 .call();
+        var config = git.getRepository().getConfig();
+        config.setBoolean("commit", null, "gpgsign", false);
+        config.save();
+
+        writeString(root.resolve("a.txt"), "a");
 
         git.add().addFilepattern(".").call();
         git.commit().setMessage("First commit").call();
     }
 
     @Test
-    public void testGT_status1() {
+    public void testGT_status1(Console console) {
         GitTool gt = new GitTool(Runtime.getRuntime(), console.tty(), env);
 
         gt.execute("st");
@@ -76,20 +81,20 @@ public class GitToolTest {
     }
 
     @Test
-    public void testGT_status2() throws GitAPIException {
+    public void testGT_status2(Console console) throws GitAPIException, IOException {
         git.checkout().setName("other").setCreateBranch(true).call();
 
-        writeContentTo("b", new File(root, "b.txt"));
+        writeString(root.resolve("b.txt"), "b");
         git.add().addFilepattern(".").call();
         git.commit().setMessage("Second commit").call();
 
-        writeContentTo("c", new File(root, "b.txt"));
+        writeString(root.resolve("b.txt"), "c", StandardOpenOption.TRUNCATE_EXISTING);
         git.add().addFilepattern(".").call();
         git.commit().setMessage("Third commit").call();
 
         git.checkout().setName("master").call();
 
-        writeContentTo("d", new File(root, "d.txt"));
+        writeString(root.resolve("d.txt"), "d");
         git.add().addFilepattern(".").call();
         git.commit().setMessage("Fourth commit").call();
 
@@ -109,20 +114,20 @@ public class GitToolTest {
 
 
     @Test
-    public void testGT_status3() throws GitAPIException {
+    public void testGT_status3(Console console) throws GitAPIException, IOException {
         git.checkout().setName("other").setCreateBranch(true).call();
 
-        writeContentTo("b", new File(root, "b.txt"));
+        writeString(root.resolve("b.txt"), "b");
         git.add().addFilepattern(".").call();
         git.commit().setMessage("Second commit").call();
 
-        writeContentTo("c", new File(root, "b.txt"));
+        writeString(root.resolve("b.txt"), "c");
         git.add().addFilepattern(".").call();
         git.commit().setMessage("Third commit").call();
 
         git.checkout().setName("master").call();
 
-        writeContentTo("d", new File(root, "d.txt"));
+        writeString(root.resolve("d.txt"), "d");
         git.add().addFilepattern(".").call();
         git.commit().setMessage("Fourth commit").call();
 
@@ -132,9 +137,11 @@ public class GitToolTest {
 
         gt.execute("st", "-r");
 
-        assertThat(cleanOutPut(console.output()), is(
-                "Commits on other [+2,-1] since HH:mm:dd -- [d:master] First commit\n" +
-                " A b.txt\n"));
+        assertThat(cleanOutPut(console.output()),
+                   is("""
+                              Commits on other [+2,-1] since HH:mm:dd -- [d:master] First commit
+                               A b.txt
+                              """));
         assertThat(console.error(), is(""));
     }
 

@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>net.morimekta.gittool</groupId>
     <artifactId>gittool</artifactId>
-    <version>2.0-SNAPSHOT</version>
+    <version>3.0-SNAPSHOT</version>
     <packaging>jar</packaging>
 
     <name>Git-Tool</name>
@@ -57,21 +57,12 @@
         <project.javadoc.encoding>UTF-8</project.javadoc.encoding>
         <project.reporting.inputEncoding>UTF-8</project.reporting.inputEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-        <maven.compiler.source>1.8</maven.compiler.source>
-        <maven.compiler.target>1.8</maven.compiler.target>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
         <maven.sources.encoding>UTF-8</maven.sources.encoding>
 
         <!-- testing versions -->
-        <junit.version>4.13.1</junit.version>
-        <hamcrest.version>1.3</hamcrest.version>
-        <mockito.version>2.7.21</mockito.version>
         <jacoco.version>0.7.6.201602180812</jacoco.version>
-
-        <!-- library versions -->
-        <slf4j.version>1.7.32</slf4j.version>
-        <guava.version>31.0.1-jre</guava.version>
-        <jgit.version>4.6.1.201703071140-r</jgit.version>
-        <morimekta_utils.version>2.0.0</morimekta_utils.version>
     </properties>
 
     <dependencyManagement>
@@ -79,48 +70,48 @@
             <dependency>
                 <groupId>net.morimekta.utils</groupId>
                 <artifactId>io</artifactId>
-                <version>4.3.0</version>
+                <version>4.6.0</version>
             </dependency>
             <dependency>
                 <groupId>net.morimekta.utils</groupId>
-                <artifactId>terminal</artifactId>
-                <version>4.0.0</version>
+                <artifactId>terminal-io</artifactId>
+                <version>5.0.0</version>
+            </dependency>
+            <dependency>
+                <groupId>net.morimekta.utils</groupId>
+                <artifactId>terminal-args</artifactId>
+                <version>5.0.0</version>
             </dependency>
             <dependency>
                 <groupId>net.morimekta.utils</groupId>
                 <artifactId>strings</artifactId>
-                <version>4.3.0</version>
+                <version>4.5.1</version>
             </dependency>
             <dependency>
                 <groupId>net.morimekta.utils</groupId>
-                <artifactId>testing</artifactId>
-                <version>4.1.0</version>
+                <artifactId>collect</artifactId>
+                <version>5.0.0</version>
             </dependency>
 
             <dependency>
                 <groupId>org.eclipse.jgit</groupId>
                 <artifactId>org.eclipse.jgit</artifactId>
-                <version>${jgit.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.google.guava</groupId>
-                <artifactId>guava</artifactId>
-                <version>${guava.version}</version>
+                <version>6.9.0.202403050737-r</version>
             </dependency>
             <dependency>
                 <groupId>org.slf4j</groupId>
                 <artifactId>slf4j-api</artifactId>
-                <version>${slf4j.version}</version>
+                <version>2.0.13</version>
             </dependency>
             <dependency>
                 <groupId>org.slf4j</groupId>
                 <artifactId>slf4j-nop</artifactId>
-                <version>${slf4j.version}</version>
+                <version>2.0.13</version>
             </dependency>
             <dependency>
                 <groupId>org.slf4j</groupId>
                 <artifactId>jcl-over-slf4j</artifactId>
-                <version>${slf4j.version}</version>
+                <version>2.0.13</version>
             </dependency>
             <dependency>
                 <groupId>org.apache.httpcomponents</groupId>
@@ -133,36 +124,10 @@
                     </exclusion>
                 </exclusions>
             </dependency>
-
-            <!-- test deps -->
-            <dependency>
-                <groupId>org.hamcrest</groupId>
-                <artifactId>hamcrest-core</artifactId>
-                <version>${hamcrest.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.hamcrest</groupId>
-                <artifactId>hamcrest-library</artifactId>
-                <version>${hamcrest.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>junit</groupId>
-                <artifactId>junit</artifactId>
-                <version>${junit.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.mockito</groupId>
-                <artifactId>mockito-core</artifactId>
-                <version>${mockito.version}</version>
-            </dependency>
         </dependencies>
     </dependencyManagement>
 
     <dependencies>
-        <dependency>
-            <groupId>com.google.guava</groupId>
-            <artifactId>guava</artifactId>
-        </dependency>
         <dependency>
             <groupId>org.eclipse.jgit</groupId>
             <artifactId>org.eclipse.jgit</artifactId>
@@ -170,7 +135,15 @@
 
         <dependency>
             <groupId>net.morimekta.utils</groupId>
-            <artifactId>terminal</artifactId>
+            <artifactId>collect</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>net.morimekta.utils</groupId>
+            <artifactId>terminal-io</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>net.morimekta.utils</groupId>
+            <artifactId>terminal-args</artifactId>
         </dependency>
         <dependency>
             <groupId>org.slf4j</groupId>
@@ -184,21 +157,37 @@
         <dependency>
             <groupId>net.morimekta.utils</groupId>
             <artifactId>testing</artifactId>
+            <version>5.6.1</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>net.morimekta.utils</groupId>
+            <artifactId>testing-junit5</artifactId>
+            <version>5.6.1</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.hamcrest</groupId>
             <artifactId>hamcrest-library</artifactId>
+            <version>2.2</version>
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>junit</groupId>
-            <artifactId>junit</artifactId>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>5.10.2</version>
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>org.mockito</groupId>
-            <artifactId>mockito-core</artifactId>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-api</artifactId>
+            <version>5.10.2</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-engine</artifactId>
+            <version>5.10.2</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
@@ -217,95 +206,95 @@
                 <plugin>
                     <groupId>org.codehaus.mojo</groupId>
                     <artifactId>rpm-maven-plugin</artifactId>
-                    <version>2.1.5</version>
+                    <version>2.2.0</version>
                 </plugin>
                 <plugin>
                     <groupId>org.vafer</groupId>
                     <artifactId>jdeb</artifactId>
-                    <version>1.5</version>
+                    <version>1.8</version>
                 </plugin>
 
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-install-plugin</artifactId>
-                    <version>2.5.2</version>
+                    <version>3.1.2</version>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-deploy-plugin</artifactId>
-                    <version>2.8.2</version>
+                    <version>3.1.2</version>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-release-plugin</artifactId>
-                    <version>2.5.3</version>
+                    <version>3.1.0</version>
                     <dependencies>
                         <dependency>
                             <groupId>org.apache.maven.scm</groupId>
                             <artifactId>maven-scm-api</artifactId>
-                            <version>1.9.1</version>
+                            <version>2.1.0</version>
                         </dependency>
                         <dependency>
                             <groupId>org.apache.maven.scm</groupId>
                             <artifactId>maven-scm-provider-gitexe</artifactId>
-                            <version>1.9.1</version>
+                            <version>2.1.0</version>
                         </dependency>
                     </dependencies>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-clean-plugin</artifactId>
-                    <version>3.0.0</version>
+                    <version>3.3.2</version>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-javadoc-plugin</artifactId>
-                    <version>2.10.3</version>
+                    <version>3.6.3</version>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-jar-plugin</artifactId>
-                    <version>2.6</version>
+                    <version>3.4.1</version>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-resources-plugin</artifactId>
-                    <version>2.7</version>
+                    <version>3.3.1</version>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-site-plugin</artifactId>
-                    <version>3.5</version>
+                    <version>3.12.1</version>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-surefire-plugin</artifactId>
-                    <version>2.19.1</version>
+                    <version>3.3.1</version>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-compiler-plugin</artifactId>
-                    <version>3.5.1</version>
+                    <version>3.13.0</version>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-gpg-plugin</artifactId>
-                    <version>1.6</version>
+                    <version>3.2.4</version>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-source-plugin</artifactId>
-                    <version>3.0.0</version>
+                    <version>3.3.1</version>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-project-info-reports-plugin</artifactId>
-                    <version>2.9</version>
+                    <version>3.6.2</version>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-surefire-report-plugin</artifactId>
-                    <version>2.19.1</version>
+                    <version>3.3.1</version>
                 </plugin>
             </plugins>
         </pluginManagement>
@@ -314,7 +303,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
-                <version>2.4.3</version>
+                <version>3.6.0</version>
                 <executions>
                     <execution>
                         <phase>package</phase>
@@ -323,20 +312,26 @@
                         </goals>
                         <configuration>
                             <minimizeJar>true</minimizeJar>
-                            <createDependencyReducedPom>false</createDependencyReducedPom>
+                            <createDependencyReducedPom>true</createDependencyReducedPom>
                             <filters>
                                 <filter>
                                     <artifact>*:*</artifact>
                                     <excludes>
                                         <!-- The accompanied license and notice is not from this project. -->
                                         <exclude>META-INF/LICENSE</exclude>
+                                        <exclude>META-INF/LICENSE.txt</exclude>
                                         <exclude>META-INF/NOTICE</exclude>
+                                        <exclude>META-INF/NOTICE.txt</exclude>
                                         <exclude>META-INF/DEPENDENCIES</exclude>
+                                        <exclude>META-INF/MANIFEST.MF</exclude>
                                         <exclude>META-INF/maven/</exclude>
                                         <exclude>META-INF/*.SF</exclude>
                                         <exclude>META-INF/*.DSA</exclude>
                                         <exclude>META-INF/*.RSA</exclude>
                                         <exclude>META-INF/maven/**</exclude>
+                                        <exclude>module-info.class</exclude>
+                                        <exclude>META-INF/versions/9/module-info.class</exclude>
+                                        <exclude>**/package-info.class</exclude>
                                         <exclude>**/package.html</exclude>
                                         <exclude>**/overview.html</exclude>
                                         <exclude>**/pom.xml</exclude>
@@ -346,14 +341,18 @@
                                     </excludes>
                                 </filter>
                                 <filter>
-                                    <artifact>org.slf4j:*</artifact>
+                                    <artifact>org.slf4j:slf4j-nop</artifact>
                                     <includes>
                                         <include>org/slf4j/**</include>
+                                        <include>META-INF/services/**</include>
                                     </includes>
                                 </filter>
                             </filters>
                             <transformers>
-                                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                <transformer
+                                        implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                                <transformer
+                                        implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                                     <mainClass>net.morimekta.gittool.GitTool</mainClass>
                                 </transformer>
                             </transformers>
@@ -456,7 +455,7 @@
 
                             <!-- dependencies -->
                             <requires>
-                                <require>java &gt;= 1.8</require>
+                                <require>java &gt;= 17</require>
                             </requires>
 
                             <!-- mapping -->
@@ -467,7 +466,7 @@
                                     <username>root</username>
                                     <sources>
                                         <source>
-                                            <location>${project.basedir}/src/deb/bin</location>
+                                            <location>${project.basedir}/src/assembly/bin</location>
                                         </source>
                                     </sources>
                                 </mapping>
