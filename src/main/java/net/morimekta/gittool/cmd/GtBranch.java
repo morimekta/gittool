@@ -21,7 +21,6 @@ import net.morimekta.io.tty.TTYMode;
 import net.morimekta.strings.chr.Char;
 import net.morimekta.strings.chr.Color;
 import net.morimekta.terminal.Terminal;
-import net.morimekta.terminal.args.ArgParser;
 import net.morimekta.terminal.selection.Selection;
 import net.morimekta.terminal.selection.SelectionReaction;
 import org.eclipse.jgit.api.ListBranchCommand;
@@ -60,15 +59,7 @@ public class GtBranch extends Command {
 
     private final List<BranchInfo> branches = new LinkedList<>();
 
-    public GtBranch(ArgParser.Builder ignore) {
-    }
-
-    private String branchName(Ref ref) {
-        if (ref.getName().startsWith("refs/heads/")) {
-            return ref.getName().substring(11);
-        }
-        return ref.getName();
-    }
+    public GtBranch() {}
 
     private BranchInfo   currentInfo = null;
     private BranchAction action      = null;

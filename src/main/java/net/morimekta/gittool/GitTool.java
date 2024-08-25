@@ -149,7 +149,7 @@ public class GitTool {
                 .add(flagLong("--verbose", "Show verbose exceptions", this::setVerbose))
                 .withSubCommands("cmd", "", this::setCommand)
                 .add(subCommand("help", "Show help", GtHelp::new).alias("h"))
-                .add(subCommand("branch", "Change branch", parser -> new GtBranch(parser)).alias("br", "b"))
+                .add(subCommand("branch", "Change branch", parser -> new GtBranch()).alias("br", "b"))
                 .add(subCommand("status", "Review branch status", GtStatus::new).alias("st"))
                 .build();
     }
