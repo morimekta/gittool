@@ -136,8 +136,6 @@ public class GtStatus extends Command {
             ObjectId currentHead = currentRef.getObjectId();
             ObjectId diffWithHead = diffWithRef.getObjectId();
 
-            // RevCommit currentCommit = commitOf(repository, currentHead);
-
             if (!currentHead.equals(diffWithHead)) {
                 String stats = "";
                 String diff = gt.isRemote(diffWithBranch)
@@ -164,13 +162,13 @@ public class GtStatus extends Command {
                                .call()).reversed();
                     ancestor = sub2.get(0);
                 } else {
-                    ancestor = gt.commitOf(repository, diffWithBranch)
+                    ancestor = gt.commitOf(diffWithBranch)
                                  .orElseThrow(() -> new IOException("No commit on " + diffWithBranch));
                 }
                 if (!localCommits.isEmpty()) {
                     local = localCommits.get(localCommits.size() - 1);
                 } else {
-                    local = gt.commitOf(repository, currentBranch)
+                    local = gt.commitOf(currentBranch)
                               .orElseThrow(() -> new IOException("No commit on " + currentBranch));
                 }
 
@@ -250,7 +248,7 @@ public class GtStatus extends Command {
                     }
                 }
             } else {
-                RevCommit diffWithCommit = gt.commitOf(repository, diffWithBranch)
+                RevCommit diffWithCommit = gt.commitOf(diffWithBranch)
                                              .orElseThrow(() -> new IOException("No commit in " + diffWithBranch));
                 System.out.printf("No commits on %s%s%s since %s -- %s%s%s%n",
                                   GREEN,

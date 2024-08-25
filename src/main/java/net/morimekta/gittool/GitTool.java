@@ -15,6 +15,8 @@
  */
 package net.morimekta.gittool;
 
+import net.morimekta.collect.UnmodifiableSet;
+import net.morimekta.collect.util.LazyCachedSupplier;
 import net.morimekta.gittool.cmd.Command;
 import net.morimekta.gittool.cmd.GtBranch;
 import net.morimekta.gittool.cmd.GtHelp;
@@ -24,6 +26,7 @@ import net.morimekta.io.tty.TTY;
 import net.morimekta.terminal.args.ArgException;
 import net.morimekta.terminal.args.ArgHelp;
 import net.morimekta.terminal.args.ArgParser;
+import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.lib.ObjectId;
@@ -31,6 +34,7 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
+import org.eclipse.jgit.transport.RemoteConfig;
 
 import java.io.File;
 import java.io.IOException;
@@ -40,6 +44,7 @@ import java.nio.file.Paths;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static net.morimekta.terminal.args.Flag.flag;
 import static net.morimekta.terminal.args.Flag.flagLong;
@@ -49,7 +54,9 @@ import static net.morimekta.terminal.args.ValueParser.dir;
 
 public class GitTool {
     private static final String DOT_GIT = ".git";
-    public final         TTY    tty;
+    public static        Path   pwd;
+
+    public final TTY tty;
 
     public ArgParser parser = null;
 
@@ -60,9 +67,10 @@ public class GitTool {
 
     private File       repositoryRoot = null;
     private Repository repository     = null;
+    private Git        git            = null;
 
     private final Map<String, String> env;
-    public static Path                pwd;
+
 
     protected GitTool(TTY tty, Map<String, String> env) {
         this.tty = tty;
@@ -113,6 +121,13 @@ public class GitTool {
         return repository;
     }
 
+    public Git getGit() throws IOException {
+        if (git == null) {
+            git = new Git(getRepository());
+        }
+        return git;
+    }
+
     public boolean showHelp() {
         return (help || command == null);
     }
@@ -141,13 +156,26 @@ public class GitTool {
 
     private static final String MASTER = "master";
 
-    public String getDefaultBranch() {
+    public LazyCachedSupplier<String> defaultBranch = LazyCachedSupplier.lazyCache(() -> {
         String tmp = repository.getConfig().getString("default", null, "branch");
         if (tmp != null) {
             return tmp;
         }
         return MASTER;
-    }
+    });
+
+    public LazyCachedSupplier<Set<String>> remoteNames = LazyCachedSupplier.lazyCache(() -> {
+        try {
+            return getGit().remoteList()
+                           .call()
+                           .stream()
+                           .map(RemoteConfig::getName)
+                           .sorted()
+                           .collect(UnmodifiableSet.toSet());
+        } catch (IOException | GitAPIException e) {
+            throw new RuntimeException(e);
+        }
+    });
 
     public String getDiffbase(String branch) {
         String tmp = repository.getConfig().getString("branch", branch, "diffbase");
@@ -158,7 +186,7 @@ public class GitTool {
         if (remote != null) {
             return remote;
         }
-        return getDefaultBranch();
+        return defaultBranch.get();
     }
 
     public String getRemote(String branch) {
@@ -174,9 +202,9 @@ public class GitTool {
         return null;
     }
 
-    public Optional<RevCommit> commitOf(Repository repository, String branch) throws IOException {
-        ObjectId oid = repository.resolve(refName(branch));
-        try (RevWalk revWalk = new RevWalk(repository)) {
+    public Optional<RevCommit> commitOf(String branch) throws IOException {
+        ObjectId oid = getRepository().resolve(refName(branch));
+        try (RevWalk revWalk = new RevWalk(getRepository())) {
             return Optional.ofNullable(revWalk.parseCommit(oid));
         } catch (MissingObjectException e) {
             return Optional.empty();
@@ -185,7 +213,11 @@ public class GitTool {
 
     public boolean isRemote(String branch) {
         // a/b is branch 'b' in remote 'a', so 'origin/master'...
-        return branch.contains("/");
+        if (branch.contains("/")) {
+            var opt = branch.substring(0, branch.indexOf('/'));
+            return remoteNames.get().contains(opt);
+        }
+        return false;
     }
 
     public String refName(String branch) {
@@ -212,7 +244,19 @@ public class GitTool {
                 return;
             }
 
-            command.execute(this);
+            try {
+                command.execute(this);
+            } finally {
+                var g = git;
+                if (g != null) {
+                    g.close();
+                }
+
+                var repo = repository;
+                if (repo != null) {
+                    repo.close();
+                }
+            }
             return;
         } catch (ArgException e) {
             System.err.println("Argument Error: " + e.getMessage());

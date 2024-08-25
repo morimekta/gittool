@@ -35,7 +35,7 @@ public abstract class Command {
      * Execute command with the main GitTool options op.
      *
      * @param opts The main gittool options.
-     * @throws Exception
+     * @throws Exception On any error.
      */
     public abstract void execute(GitTool opts) throws Exception;
 }
