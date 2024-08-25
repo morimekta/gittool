@@ -200,29 +200,13 @@ public class GtBranch extends Command {
                         }
                         case DELETE: {
                             if (selected.localCommits() == 0 || terminal.confirm(
-                                    "Do you really want to delete branch " +
+                                    "Do you " + BOLD + "really" + CLEAR + " want to delete branch " +
                                     YELLOW + selected.name() + CLEAR + " with " +
                                     GREEN + "+" + selected.localCommits() + CLEAR + " commits?")) {
-                                try {
-                                    gt.getGit().branchDelete()
-                                      .setBranchNames(selected.name())
-                                      .call();
-                                } catch (GitAPIException se) {
-                                    terminal.lp().println(se.getMessage());
-                                    if (terminal.confirm("Do you "
-                                                         + BOLD
-                                                         + "really"
-                                                         + CLEAR
-                                                         + " want to delete branch?")) {
-                                        gt.getGit().branchDelete()
-                                          .setBranchNames(selected.name())
-                                          .setForce(true)
-                                          .call();
-                                    } else {
-                                        terminal.lp().info("Delete canceled.");
-                                        return;
-                                    }
-                                }
+                                gt.getGit().branchDelete()
+                                  .setBranchNames(selected.name())
+                                  .setForce(true)
+                                  .call();
                                 terminal.lp().info("Deleted branch " + RED + selected.name() + CLEAR + "!");
                                 tmpSelected = currentInfo;
                             } else {
