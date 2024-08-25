@@ -15,7 +15,6 @@
  */
 package net.morimekta.gittool;
 
-import net.morimekta.collect.UnmodifiableList;
 import net.morimekta.gittool.cmd.Command;
 import net.morimekta.gittool.cmd.GtBranch;
 import net.morimekta.gittool.cmd.GtHelp;
@@ -26,10 +25,10 @@ import net.morimekta.terminal.args.ArgException;
 import net.morimekta.terminal.args.ArgHelp;
 import net.morimekta.terminal.args.ArgParser;
 import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.revwalk.RevSort;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 
@@ -176,11 +175,11 @@ public class GitTool {
     }
 
     public Optional<RevCommit> commitOf(Repository repository, String branch) throws IOException {
+        ObjectId oid = repository.resolve(refName(branch));
         try (RevWalk revWalk = new RevWalk(repository)) {
-            ObjectId oid = repository.resolve(refName(branch));
-            revWalk.markStart(revWalk.parseCommit(oid));
-            revWalk.sort(RevSort.COMMIT_TIME_DESC);
-            return Optional.ofNullable(UnmodifiableList.asList(revWalk).get(0));
+            return Optional.ofNullable(revWalk.parseCommit(oid));
+        } catch (MissingObjectException e) {
+            return Optional.empty();
         }
     }
 

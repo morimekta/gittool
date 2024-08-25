@@ -73,6 +73,7 @@ public class GtBranch extends Command {
         String name     = null;
         String diffbase = null;
         String remote   = null;
+        boolean remoteGone = false;
 
         int commits = 0;
         int missing = 0;
@@ -223,6 +224,9 @@ public class GtBranch extends Command {
 
             info.diffbase = gt.getDiffbase(info.name);
             info.remote = gt.getRemote(info.name);
+            if (info.remote != null) {
+                info.remoteGone = gt.commitOf(gt.getRepository(), info.remote).isEmpty();
+            }
 
             Ref currentRef = repository.getRefDatabase().findRef(gt.refName(info.name));
             Ref diffWithRef = repository.getRefDatabase().findRef(gt.refName(info.diffbase));
