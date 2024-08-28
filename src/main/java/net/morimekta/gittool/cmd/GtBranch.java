@@ -86,6 +86,8 @@ public class GtBranch extends Command {
             longestBranchName = Math.max(longestBranchName, printableWidth(info.name()));
             longestRemoteName = Math.max(longestRemoteName, printableWidth(info.diffBase()));
 
+            info.branchLine(null, longestBranchName, longestRemoteName);
+
             branches.add(info);
         }
 

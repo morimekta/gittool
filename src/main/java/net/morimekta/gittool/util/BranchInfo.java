@@ -8,6 +8,7 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
 
 import java.io.IOException;
+import java.util.Optional;
 
 import static net.morimekta.collect.UnmodifiableList.asList;
 import static net.morimekta.collect.util.LazyCachedSupplier.lazyCache;
@@ -22,12 +23,12 @@ import static net.morimekta.strings.chr.Color.YELLOW;
 public class BranchInfo implements Comparable<BranchInfo> {
     private final String name;
 
-    private final LazyCachedSupplier<Boolean> isCurrent;
-    private final LazyCachedSupplier<Boolean> isDefault;
-    private final LazyCachedSupplier<Boolean> hasUncommitted;
-    private final LazyCachedSupplier<String>  diffBase;
-    private final LazyCachedSupplier<String>  remote;
-    private final LazyCachedSupplier<Boolean> remoteGone;
+    private final LazyCachedSupplier<Boolean>          isCurrent;
+    private final LazyCachedSupplier<Boolean>          isDefault;
+    private final LazyCachedSupplier<Boolean>          hasUncommitted;
+    private final LazyCachedSupplier<String>           diffBase;
+    private final LazyCachedSupplier<Optional<String>> remote;
+    private final LazyCachedSupplier<Boolean>          remoteGone;
 
     private final LazyCachedSupplier<Ref>     diffBaseRef;
     private final LazyCachedSupplier<Integer> localCommits;
@@ -61,13 +62,14 @@ public class BranchInfo implements Comparable<BranchInfo> {
             }
         });
 
-        this.remote = lazyCache(() -> gt.getRemote(name));
+        this.remote = lazyCache(() -> Optional.ofNullable(gt.getRemote(name)));
         this.remoteGone = lazyCache(() -> {
-            if (remote.get() == null) {
-                return false;
-            }
             try {
-                return gt.commitOf(remote.get()).isEmpty();
+                var r = remote.get();
+                if (r.isPresent()) {
+                    return gt.commitOf(r.get()).isEmpty();
+                }
+                return false;
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
@@ -116,6 +118,10 @@ public class BranchInfo implements Comparable<BranchInfo> {
         return diffBase.get();
     }
 
+    public String remote() {
+        return remote.get().orElse(null);
+    }
+
     public boolean isCurrent() {
         return isCurrent.get();
     }
@@ -153,10 +159,10 @@ public class BranchInfo implements Comparable<BranchInfo> {
         if (diffBase().equals(name)) {
             builder.append("    ")
                    .append(" ".repeat(longestRemoteName));
-        } else if (remote.get() != null) {
+        } else if (remote() != null) {
             builder.append(" <- ")
                    .append(DIM)
-                   .append(rightPad(remote.get(), longestRemoteName));
+                   .append(rightPad(remote(), longestRemoteName));
             clr(builder, baseColor);
         } else {
             builder.append(" d: ")
@@ -181,7 +187,7 @@ public class BranchInfo implements Comparable<BranchInfo> {
                 clr(builder, baseColor);
             }
 
-            if (remote.get() != null && !diffBase().equals(remote.get())) {
+            if (remote() != null && !diffBase().equals(remote())) {
                 builder.append(",")
                        .append(BOLD)
                        .append("%%");
@@ -196,7 +202,7 @@ public class BranchInfo implements Comparable<BranchInfo> {
             builder.append("]");
         }
 
-        if (hasUncommitted.get()) {
+        if (isCurrent() && hasUncommitted.get()) {
             builder.append(" -- ")
                    .append(new net.morimekta.strings.chr.Color(BOLD, RED))
                    .append("MOD");
