@@ -4,59 +4,95 @@ import net.morimekta.collect.util.LazyCachedSupplier;
 import net.morimekta.gittool.GitTool;
 import net.morimekta.strings.chr.Color;
 import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.diff.DiffEntry;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
 import java.util.Optional;
 
 import static net.morimekta.collect.UnmodifiableList.asList;
 import static net.morimekta.collect.util.LazyCachedSupplier.lazyCache;
 import static net.morimekta.strings.StringUtil.rightPad;
-import static net.morimekta.strings.chr.Color.BOLD;
-import static net.morimekta.strings.chr.Color.CLEAR;
-import static net.morimekta.strings.chr.Color.DIM;
-import static net.morimekta.strings.chr.Color.GREEN;
-import static net.morimekta.strings.chr.Color.RED;
-import static net.morimekta.strings.chr.Color.YELLOW;
+import static net.morimekta.strings.chr.Color.*;
 
 public class BranchInfo implements Comparable<BranchInfo> {
     private final String name;
 
-    private final LazyCachedSupplier<Boolean>          isCurrent;
-    private final LazyCachedSupplier<Boolean>          isDefault;
-    private final LazyCachedSupplier<Boolean>          hasUncommitted;
-    private final LazyCachedSupplier<String>           diffBase;
+    private final LazyCachedSupplier<Boolean> isCurrent;
+    private final LazyCachedSupplier<Boolean> isDefault;
+    private final LazyCachedSupplier<Boolean> hasUncommitted;
+    private final LazyCachedSupplier<String> diffBase;
     private final LazyCachedSupplier<Optional<String>> remote;
-    private final LazyCachedSupplier<Boolean>          remoteGone;
+    private final LazyCachedSupplier<Boolean> remoteGone;
 
-    private final LazyCachedSupplier<Ref>     diffBaseRef;
+    private final LazyCachedSupplier<Boolean> diffBaseIsDefault;
+    private final LazyCachedSupplier<Optional<Ref>> diffBaseRef;
     private final LazyCachedSupplier<Integer> localCommits;
     private final LazyCachedSupplier<Integer> missingCommits;
 
     public BranchInfo(Ref currentRef, GitTool gt) {
         this.name = currentRef.getName().startsWith("refs/heads/")
-                    ? currentRef.getName().substring(11)
-                    : currentRef.getName();
+                ? currentRef.getName().substring(11)
+                : currentRef.getName();
 
         this.isCurrent = lazyCache(() -> {
             try {
                 return currentRef.getName().equals(gt.getRepository().getFullBranch());
             } catch (IOException e) {
-                throw new RuntimeException(e);
+                throw new UncheckedIOException(e);
             }
         });
         this.isDefault = lazyCache(() -> name.equals(gt.defaultBranch.get()));
         this.hasUncommitted = lazyCache(() -> {
             try {
-                return !gt.getGit().diff()
-                          .setShowNameAndStatusOnly(true)
-                          .setCached(true)
-                          .call().isEmpty() ||
-                       !gt.getGit().diff()
-                          .setShowNameAndStatusOnly(true)
-                          .setCached(false)
-                          .call().isEmpty();
+                if (isCurrent()) {
+                    var hasCached = !gt.getGit().diff()
+                            .setShowNameAndStatusOnly(true)
+                            .setCached(true)
+                            .call().isEmpty();
+                    if (hasCached) {
+                        gt.getGit().diff()
+                                .setCached(true)
+                                .call()
+                                .forEach(System.out::println);
+                    }
+                    var hasUncached = gt.getGit().diff()
+                            .setShowNameAndStatusOnly(true)
+                            .setCached(false)
+                            .call()
+                            .stream()
+                            .anyMatch(i -> {
+                                if (i.getChangeType() == DiffEntry.ChangeType.DELETE) {
+                                    try {
+                                        var path = gt.getRepositoryRoot().resolve(i.getOldPath());
+                                        if (Files.isDirectory(path)) {
+                                            System.out.println("DIR: " + path);
+                                            // Weirdness where it reports empty folders that are checked
+                                            // in as a folder as deleted.
+                                            return false;
+                                        }
+                                    } catch (IOException e) {
+                                        System.out.println("EX: " + i);
+                                        return true;
+                                    }
+                                }
+                                System.out.println("NOP: " + i);
+                                return true;
+                            });
+                    if (hasUncached) {
+                        gt.getGit().diff()
+                                .setCached(false)
+                                .call()
+                                .forEach(System.out::println);
+                    }
+
+                    return hasCached || hasUncached;
+                } else {
+                    return false;
+                }
             } catch (GitAPIException | IOException e) {
                 throw new RuntimeException(e);
             }
@@ -71,23 +107,25 @@ public class BranchInfo implements Comparable<BranchInfo> {
                 }
                 return false;
             } catch (IOException e) {
-                throw new RuntimeException(e);
+                throw new UncheckedIOException(e);
             }
         });
 
         this.diffBase = lazyCache(() -> gt.getDiffbase(name));
+        this.diffBaseIsDefault = lazyCache(() -> diffBase().equals(gt.defaultBranch.get()));
         this.diffBaseRef = lazyCache(() -> {
             try {
-                return gt.getRepository().getRefDatabase().findRef(gt.refName(diffBase.get()));
+                return Optional.ofNullable(gt.getRepository().getRefDatabase().findRef(gt.refName(diffBase.get())));
             } catch (IOException e) {
-                throw new RuntimeException(e);
+                throw new UncheckedIOException(e);
             }
         });
 
         this.localCommits = lazyCache(() -> {
+            if (diffBase().equals(name)) return 0;
             ObjectId currentHead = currentRef.getObjectId();
-            ObjectId diffWithHead = diffBaseRef.get().getObjectId();
-            if (diffWithHead.equals(currentHead)) {
+            ObjectId diffWithHead = diffBaseRef.get().map(Ref::getObjectId).orElse(null);
+            if (diffWithHead == null || diffWithHead.equals(currentHead)) {
                 return 0;
             }
             try {
@@ -97,9 +135,10 @@ public class BranchInfo implements Comparable<BranchInfo> {
             }
         });
         this.missingCommits = lazyCache(() -> {
+            if (diffBase().equals(name)) return 0;
             ObjectId currentHead = currentRef.getObjectId();
-            ObjectId diffWithHead = diffBaseRef.get().getObjectId();
-            if (diffWithHead.equals(currentHead)) {
+            ObjectId diffWithHead = diffBaseRef.get().map(Ref::getObjectId).orElse(null);
+            if (diffWithHead == null || diffWithHead.equals(currentHead)) {
                 return 0;
             }
             try {
@@ -156,20 +195,6 @@ public class BranchInfo implements Comparable<BranchInfo> {
         }
         builder.append(rightPad(name, longestBranchName));
         clr(builder, baseColor);
-        if (diffBase().equals(name)) {
-            builder.append("    ")
-                   .append(" ".repeat(longestRemoteName));
-        } else if (remote() != null) {
-            builder.append(" <- ")
-                   .append(DIM)
-                   .append(rightPad(remote(), longestRemoteName));
-            clr(builder, baseColor);
-        } else {
-            builder.append(" d: ")
-                   .append(new net.morimekta.strings.chr.Color(YELLOW, DIM))
-                   .append(rightPad(diffBase(), longestRemoteName));
-            clr(builder, baseColor);
-        }
 
         if (localCommits() > 0 || missingCommits() > 0) {
             builder.append(" [");
@@ -183,31 +208,34 @@ public class BranchInfo implements Comparable<BranchInfo> {
                 builder.append(CLR_ADDS).append("+").append(localCommits());
                 clr(builder, baseColor);
                 builder.append(",")
-                       .append(CLR_SUBS).append("-").append(missingCommits());
-                clr(builder, baseColor);
-            }
-
-            if (remote() != null && !diffBase().equals(remote())) {
-                builder.append(",")
-                       .append(BOLD)
-                       .append("%%");
-                clr(builder, baseColor);
-            }
-            if (remoteGone.get()) {
-                builder.append(DIM)
-                       .append(" gone");
+                        .append(CLR_SUBS).append("-").append(missingCommits());
                 clr(builder, baseColor);
             }
 
             builder.append("]");
         }
 
-        if (isCurrent() && hasUncommitted.get()) {
+        if (hasUncommitted.get()) {
             builder.append(" -- ")
-                   .append(new net.morimekta.strings.chr.Color(BOLD, RED))
-                   .append("MOD");
+                    .append(new Color(BOLD, RED))
+                    .append("MOD");
             clr(builder, baseColor);
             builder.append(" --");
+        }
+
+        if (remote() != null) {
+            if (remoteGone.get()) {
+                builder.append(" gone: ").append(DIM);
+            } else if (BG_BLUE.equals(baseColor)) {
+                builder.append(" <- ");
+            } else {
+                builder.append(" <- ").append(BLUE);
+            }
+            builder.append(remote());
+        } else if (!diffBaseIsDefault.get()) {
+            builder.append(" d: ")
+                    .append(YELLOW)
+                    .append(diffBase());
         }
 
         return builder.toString();

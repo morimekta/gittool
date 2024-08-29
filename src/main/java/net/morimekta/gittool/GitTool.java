@@ -36,9 +36,9 @@ import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 import org.eclipse.jgit.transport.RemoteConfig;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Locale;
@@ -54,20 +54,20 @@ import static net.morimekta.terminal.args.ValueParser.dir;
 
 public class GitTool {
     private static final String DOT_GIT = ".git";
-    public static        Path   pwd;
+    public static Path pwd;
 
     public final TTY tty;
 
     public ArgParser parser = null;
 
     private Command command = null;
-    private boolean help    = false;
+    private boolean help = false;
     private boolean version = false;
     private boolean verbose = false;
 
-    private File       repositoryRoot = null;
-    private Repository repository     = null;
-    private Git        git            = null;
+    private Path repositoryRoot = null;
+    private Repository repository = null;
+    private Git git = null;
 
     private final Map<String, String> env;
 
@@ -79,7 +79,7 @@ public class GitTool {
     }
 
     private void setRepositoryRoot(Path git_root) {
-        this.repositoryRoot = git_root.toFile();
+        this.repositoryRoot = git_root;
     }
 
     private void setCommand(Command command) {
@@ -98,12 +98,12 @@ public class GitTool {
         this.verbose = verbose;
     }
 
-    public File getRepositoryRoot() throws IOException {
+    public Path getRepositoryRoot() throws IOException {
         if (repositoryRoot == null) {
-            File current = new File(env.get("PWD")).getCanonicalFile().getAbsoluteFile();
-            while (!(new File(current, DOT_GIT)).exists()) {
-                current = current.getParentFile();
-                if (current == null) {
+            var current = pwd;
+            while (!Files.exists(current.resolve(DOT_GIT))) {
+                current = current.getParent();
+                if (current == null || current.toString().isEmpty()) {
                     throw new IOException("Not in a git repository!");
                 }
             }
@@ -115,7 +115,7 @@ public class GitTool {
     public Repository getRepository() throws IOException {
         if (repository == null) {
             repository = new FileRepositoryBuilder()
-                    .setGitDir(new File(getRepositoryRoot(), DOT_GIT))
+                    .setGitDir(getRepositoryRoot().resolve(DOT_GIT).toFile())
                     .build();
         }
         return repository;
@@ -139,11 +139,11 @@ public class GitTool {
     private ArgParser makeParser() {
         return ArgParser
                 .argParser("gt",
-                           Utils.versionString(),
-                           "Extra git tools by morimekta")
+                        Utils.versionString(),
+                        "Extra git tools by morimekta")
                 .add(optionLong("--git_repository",
-                                "The git repository root directory",
-                                dir(this::setRepositoryRoot)))
+                        "The git repository root directory",
+                        dir(this::setRepositoryRoot)))
                 .add(flag("--help", "h?", "Show help", this::setHelp))
                 .add(flag("--version", "V", "Show program version", this::setVersion))
                 .add(flagLong("--verbose", "Show verbose exceptions", this::setVerbose))
@@ -167,11 +167,11 @@ public class GitTool {
     public LazyCachedSupplier<Set<String>> remoteNames = LazyCachedSupplier.lazyCache(() -> {
         try {
             return getGit().remoteList()
-                           .call()
-                           .stream()
-                           .map(RemoteConfig::getName)
-                           .sorted()
-                           .collect(UnmodifiableSet.toSet());
+                    .call()
+                    .stream()
+                    .map(RemoteConfig::getName)
+                    .sorted()
+                    .collect(UnmodifiableSet.toSet());
         } catch (IOException | GitAPIException e) {
             throw new RuntimeException(e);
         }
@@ -181,10 +181,6 @@ public class GitTool {
         String tmp = repository.getConfig().getString("branch", branch, "diffbase");
         if (tmp != null) {
             return tmp;
-        }
-        String remote = getRemote(branch);
-        if (remote != null) {
-            return remote;
         }
         return defaultBranch.get();
     }
@@ -204,6 +200,7 @@ public class GitTool {
 
     public Optional<RevCommit> commitOf(String branch) throws IOException {
         ObjectId oid = getRepository().resolve(refName(branch));
+        if (oid == null) return Optional.empty();
         try (RevWalk revWalk = new RevWalk(getRepository())) {
             return Optional.ofNullable(revWalk.parseCommit(oid));
         } catch (MissingObjectException e) {

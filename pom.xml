@@ -92,6 +92,11 @@
                 <artifactId>collect</artifactId>
                 <version>5.0.0</version>
             </dependency>
+            <dependency>
+                <groupId>net.morimekta.utils</groupId>
+                <artifactId>file</artifactId>
+                <version>4.1.2</version>
+            </dependency>
 
             <dependency>
                 <groupId>org.eclipse.jgit</groupId>
@@ -145,6 +150,11 @@
             <groupId>net.morimekta.utils</groupId>
             <artifactId>terminal-args</artifactId>
         </dependency>
+        <dependency>
+            <groupId>net.morimekta.utils</groupId>
+            <artifactId>file</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-nop</artifactId>

@@ -3,15 +3,10 @@ package net.morimekta.gittool.util;
 import net.morimekta.strings.chr.Color;
 import org.eclipse.jgit.diff.DiffEntry;
 
-import java.nio.file.Paths;
+import java.nio.file.Path;
 
 import static net.morimekta.gittool.GitTool.pwd;
-import static net.morimekta.strings.chr.Color.BOLD;
-import static net.morimekta.strings.chr.Color.CLEAR;
-import static net.morimekta.strings.chr.Color.DIM;
-import static net.morimekta.strings.chr.Color.GREEN;
-import static net.morimekta.strings.chr.Color.RED;
-import static net.morimekta.strings.chr.Color.YELLOW;
+import static net.morimekta.strings.chr.Color.*;
 
 /**
  * The status of a single change in diff.
@@ -20,13 +15,13 @@ import static net.morimekta.strings.chr.Color.YELLOW;
  * - unstaged git
  */
 public class FileStatus {
-    private final String  root;
+    private final Path root;
     private final boolean relative;
 
     private DiffEntry staged;
     private DiffEntry unstaged;
 
-    public FileStatus(boolean relative, String root, DiffEntry un) {
+    public FileStatus(boolean relative, Path root, DiffEntry un) {
         this.relative = relative;
         this.root = root;
         this.unstaged = un;
@@ -54,7 +49,7 @@ public class FileStatus {
             }
             // With if the file was copies at least *once*, then it is copied.
             if (staged.getChangeType() == DiffEntry.ChangeType.COPY ||
-                unstaged.getChangeType() == DiffEntry.ChangeType.COPY) {
+                    unstaged.getChangeType() == DiffEntry.ChangeType.COPY) {
                 return DiffEntry.ChangeType.COPY;
             }
             return DiffEntry.ChangeType.RENAME;
@@ -80,7 +75,7 @@ public class FileStatus {
             };
         } else {
             return "" + stageChangeLetter(staged.getChangeType())
-                   + stageChangeLetter(unstaged.getChangeType());
+                    + stageChangeLetter(unstaged.getChangeType());
         }
     }
 
@@ -160,7 +155,7 @@ public class FileStatus {
 
     private String path(String path) {
         if (relative) {
-            return pwd.relativize(Paths.get(root, path)).toString();
+            return pwd.relativize(root.resolve(path)).toString();
         }
         return path;
     }
