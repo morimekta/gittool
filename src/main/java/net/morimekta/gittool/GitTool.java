@@ -19,6 +19,7 @@ import net.morimekta.collect.UnmodifiableSet;
 import net.morimekta.collect.util.LazyCachedSupplier;
 import net.morimekta.gittool.cmd.Command;
 import net.morimekta.gittool.cmd.GtBranch;
+import net.morimekta.gittool.cmd.GtDiff;
 import net.morimekta.gittool.cmd.GtHelp;
 import net.morimekta.gittool.cmd.GtStatus;
 import net.morimekta.gittool.util.Utils;
@@ -151,6 +152,7 @@ public class GitTool {
                 .add(subCommand("help", "Show help", GtHelp::new).alias("h"))
                 .add(subCommand("branch", "Change branch", parser -> new GtBranch()).alias("br", "b"))
                 .add(subCommand("status", "Review branch status", GtStatus::new).alias("st"))
+                .add(subCommand("diff", "Diff changes", GtDiff::new).alias("d"))
                 .build();
     }
 

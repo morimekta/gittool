@@ -12,7 +12,7 @@ then
           head -n 1 |\
           sed 's/.* //')"
 
-  JAVA_HOME="$(echo "$JAVA" | sed 's:/bin/java::')" exec "$JAVA" -Xmx50m -jar "${PARENT_DIR}/share/gittool/gittool.jar" "$@"
+  GT_SHARE="${PARENT_DIR}/share/gittool" JAVA_HOME="$(echo "$JAVA" | sed 's:/bin/java::')" exec "$JAVA" -Xmx50m -jar "${PARENT_DIR}/share/gittool/gittool.jar" "$@"
 else
-  exec java -Xmx50m -jar "${PARENT_DIR}/share/gittool/gittool.jar" "$@"
+  GT_SHARE="${PARENT_DIR}/share/gittool" exec java -Xmx50m -jar "${PARENT_DIR}/share/gittool/gittool.jar" "$@"
 fi

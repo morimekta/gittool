@@ -4,10 +4,15 @@ PARENT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
 # force it to use the newest available java,
 # even if an older java version is currently "selected".
-JAVA="$(update-alternatives --list java |\
-        awk -F '-' '{print $2, $0}' |\
-        sort -nr |\
-        head -n 1 |\
-        sed 's/.* //')"
+if [[ -n "$(which update-alternatives)" ]]
+then
+  JAVA="$(update-alternatives --list java |\
+          awk -F '-' '{print $2, $0}' |\
+          sort -nr |\
+          head -n 1 |\
+          sed 's/.* //')"
 
-JAVA_HOME="$(echo "$JAVA" | sed 's:/bin/java::')" exec "$JAVA" -Xmx50m -jar "${PARENT_DIR}/share/gittool/gittool.jar" "$@"
+  GT_SHARE="${PARENT_DIR}/share/gittool" JAVA_HOME="$(echo "$JAVA" | sed 's:/bin/java::')" exec "$JAVA" -Xmx50m -jar "${PARENT_DIR}/share/gittool/gittool.jar" "$@"
+else
+  GT_SHARE="${PARENT_DIR}/share/gittool" exec java -Xmx50m -jar "${PARENT_DIR}/share/gittool/gittool.jar" "$@"
+fi
