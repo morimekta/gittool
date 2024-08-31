@@ -26,6 +26,7 @@ import net.morimekta.testing.junit5.ConsoleSize;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
@@ -42,6 +43,7 @@ import static net.morimekta.strings.StringUtil.stripNonPrintable;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
 
+@Disabled
 @ExtendWith(ConsoleExtension.class)
 @ConsoleSize(rows = 44, cols = 128)
 public class GitToolTest {

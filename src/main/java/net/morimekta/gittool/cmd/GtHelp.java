@@ -51,14 +51,15 @@ public class GtHelp extends Command {
                     System.out.println();
                     System.out.println("Possible commands on a branch:");
                     System.out.println(" - <enter>: Check out branch.");
-                    System.out.println(" - 'd': Set diff base for gt on the branch.");
                     System.out.println(" - 'm': Move (rename) branch.");
+                    System.out.println(" - 'b': Set diff base for gt on the branch.");
                     System.out.println(" - 'D': Delete selected branch.");
                     System.out.println(" - 'q': Exit to console.");
                     System.out.println();
                     System.out.println("Branch line legend:");
-                    System.out.println(" 1 * master  <- origin/master -- MOD --");
-                    System.out.println(" 2   develop :d master [+1,-2]");
+                    System.out.println(" 1 * master  -- MOD -- -> origin/master");
+                    System.out.println(" 2   change  [+1] gone: origin/change");
+                    System.out.println(" 3   develop [+1,-2]");
                     System.out.println();
                     System.out.println(" \"1\": The branch index. The default branch is always sorted first");
                     System.out.println(" \"*\": The asterisk marks the current checked out branch");

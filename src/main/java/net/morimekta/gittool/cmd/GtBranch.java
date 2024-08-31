@@ -48,7 +48,6 @@ import static net.morimekta.strings.chr.Color.YELLOW;
  */
 public class GtBranch extends Command {
     private int longestBranchName = 0;
-    private int longestRemoteName = 0;
 
     private enum BranchAction {
         CHECKOUT,
@@ -84,9 +83,9 @@ public class GtBranch extends Command {
             }
 
             longestBranchName = Math.max(longestBranchName, printableWidth(info.name()));
-            longestRemoteName = Math.max(longestRemoteName, printableWidth(info.diffBase()));
 
-            info.branchLine(null, longestBranchName, longestRemoteName);
+            // Initialize info.
+            info.branchLine(null, longestBranchName);
 
             branches.add(info);
         }
@@ -114,8 +113,7 @@ public class GtBranch extends Command {
                                 action = BranchAction.CHECKOUT;
                                 return SelectionReaction.SELECT;
                             })
-                            .on('q', "quit", SelectionReaction.EXIT)
-                            .on('d', "set diffbase", (i, b, sel) -> {
+                            .on('b', "set diffbase", (i, b, sel) -> {
                                 if (b.isDefault()) {
                                     sel.warn("Not allowed to set diffbase on default branch.");
                                     return SelectionReaction.STAY;
@@ -143,7 +141,8 @@ public class GtBranch extends Command {
                                 action = BranchAction.DELETE;
                                 return SelectionReaction.SELECT;
                             })
-                            .printer((b, bg) -> b.branchLine(bg, longestBranchName, longestRemoteName))
+                            .on('q', "quit", SelectionReaction.EXIT)
+                            .printer((b, bg) -> b.branchLine(bg, longestBranchName))
                             .initial(tmpSelected)
                             .build()) {
                         tmpSelected = selection.runSelection();
