@@ -15,19 +15,16 @@
  */
 package net.morimekta.gittool.cmd;
 
-import net.morimekta.collect.UnmodifiableList;
 import net.morimekta.file.FileUtil;
 import net.morimekta.gittool.GitTool;
+import net.morimekta.gittool.util.BranchInfo;
 import net.morimekta.gittool.util.FileStatus;
 import net.morimekta.terminal.args.ArgParser;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.diff.DiffEntry;
-import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryState;
-import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -91,60 +88,37 @@ public class GtStatus extends Command {
             }
 
             var git = gt.getGit();
-            String currentBranch = repository.getBranch();
-            String diffWithBranch = branch != null ? branch : gt.getDiffbase(currentBranch);
-
             this.root = FileUtil.readCanonicalPath(gt.getRepositoryRoot());
 
-            Ref currentRef = repository.getRefDatabase().findRef(gt.refName(currentBranch));
+            var currentBranch = repository.getBranch();
+            var currentRef = repository.getRefDatabase().findRef(gt.refName(currentBranch));
+            var current = new BranchInfo(currentRef, gt);
+
+            String diffWithBranch = branch != null ? branch : current.diffBase();
             Ref diffWithRef = repository.getRefDatabase().findRef(gt.refName(diffWithBranch));
             if (diffWithRef == null) {
                 System.out.printf("No such branch %s%s%s%n", BOLD, diffWithBranch, CLEAR);
                 return;
             }
 
-            ObjectId currentHead = currentRef.getObjectId();
-            ObjectId diffWithHead = diffWithRef.getObjectId();
+            var diffWith = new BranchInfo(diffWithRef, gt);
 
-            if (!currentHead.equals(diffWithHead)) {
+            if (!current.commit().equals(diffWith.commit())) {
                 String stats = "";
                 String diff = gt.isRemote(diffWithBranch)
                               ? format("[->%s%s%s] ", BLUE, diffWithBranch, CLEAR)
                               : format("[d:%s%s%s] ", YELLOW_DIM, diffWithBranch, CLEAR);
 
-                UnmodifiableList<RevCommit> localCommits = UnmodifiableList.asList(
-                        git.log().addRange(diffWithHead, currentHead).call());
-                UnmodifiableList<RevCommit> remoteCommits = UnmodifiableList.asList(
-                        git.log().addRange(currentHead, diffWithHead).call());
+                var log = gt.log(diffWith.commit(), current.commit());
 
-                localCommits = localCommits.reversed();
-                remoteCommits = remoteCommits.reversed();
-
-                int commits = localCommits.size();
-                int missing = remoteCommits.size();
-
-                RevCommit ancestor, local;
-                if (!remoteCommits.isEmpty()) {
-                    List<RevCommit> sub2 = UnmodifiableList.asList(
-                            git.log()
-                               .add(remoteCommits.get(0))
-                               .setMaxCount(2)
-                               .call()).reversed();
-                    ancestor = sub2.get(0);
-                } else {
-                    ancestor = gt.commitOf(diffWithBranch)
-                                 .orElseThrow(() -> new IOException("No commit on " + diffWithBranch));
-                }
-                if (!localCommits.isEmpty()) {
-                    local = localCommits.get(localCommits.size() - 1);
-                } else {
-                    local = gt.commitOf(currentBranch)
-                              .orElseThrow(() -> new IOException("No commit on " + currentBranch));
-                }
+                int commits = log.local().size();
+                int missing = log.remote().size();
 
                 if (commits > 0 || missing > 0) {
                     stats = " " + addsAndDeletes(commits, missing, null);
                 }
+
+                var ancestor = gt.lastCommonAncestor(diffWith.commit(), current.commit());
 
                 System.out.printf("Commits on %s%s%s%s since %s -- %s%s%s%s%n",
                                   YELLOW_BOLD,
@@ -157,19 +131,7 @@ public class GtStatus extends Command {
                                   ancestor.getShortMessage(),
                                   CLEAR);
 
-                var reader = repository.newObjectReader();
-                var ancestorTreeIter = new CanonicalTreeParser();
-                ancestorTreeIter.reset(reader, ancestor.getTree());
-                var localTreeIter = new CanonicalTreeParser();
-                localTreeIter.reset(reader, local.getTree());
-
-                // finally get the list of changed files
-                var diffs = git.diff()
-                               .setShowNameAndStatusOnly(true)
-                               .setOldTree(ancestorTreeIter)
-                               .setNewTree(localTreeIter)
-                               .call();
-                for (DiffEntry entry : diffs) {
+                for (DiffEntry entry : gt.diff(ancestor, current.commit())) {
                     switch (entry.getChangeType()) {
                         case RENAME:
                             System.out.printf(" R %s%s%s <- %s%s%s%n",
@@ -195,15 +157,13 @@ public class GtStatus extends Command {
                     }
                 }
             } else {
-                RevCommit diffWithCommit = gt.commitOf(diffWithBranch)
-                                             .orElseThrow(() -> new IOException("No commit in " + diffWithBranch));
                 System.out.printf("No commits on %s%s%s since %s -- %s%s%s%n",
                                   GREEN,
                                   currentBranch,
                                   CLEAR,
-                                  date(diffWithCommit),
+                                  date(diffWith.commit()),
                                   DIM,
-                                  diffWithCommit.getShortMessage(),
+                                  diffWith.commit().getShortMessage(),
                                   CLEAR);
             }
 

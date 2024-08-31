@@ -17,19 +17,23 @@ package net.morimekta.gittool.cmd;
 
 import net.morimekta.gittool.GitTool;
 import net.morimekta.gittool.util.BranchInfo;
+import net.morimekta.gittool.util.SelectFile;
 import net.morimekta.io.tty.TTYMode;
 import net.morimekta.strings.chr.Char;
 import net.morimekta.strings.chr.Color;
 import net.morimekta.terminal.Terminal;
 import net.morimekta.terminal.selection.Selection;
 import net.morimekta.terminal.selection.SelectionReaction;
-import org.eclipse.jgit.api.ListBranchCommand;
 import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.diff.DiffEntry;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.StoredConfig;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.StandardOpenOption;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
@@ -51,6 +55,7 @@ public class GtBranch extends Command {
 
     private enum BranchAction {
         CHECKOUT,
+        NEW,
         DELETE,
         RENAME,
         SET_DIFFBASE,
@@ -68,8 +73,9 @@ public class GtBranch extends Command {
     private BranchInfo refreshBranchList(String selected) throws IOException, GitAPIException {
         branches.clear();
 
-        ListBranchCommand bl = gt.getGit().branchList();
-        List<Ref> refs = bl.call();
+        List<Ref> refs = gt.getGit()
+                           .branchList()
+                           .call();
 
         prompt = "Manage branches from <untracked>:";
         BranchInfo selectedInfo = null;
@@ -121,12 +127,36 @@ public class GtBranch extends Command {
                                 action = BranchAction.SET_DIFFBASE;
                                 return SelectionReaction.SELECT;
                             })
+                            .hiddenOn('B', (i, b, sel) -> {
+                                if (b.isDefault()) {
+                                    sel.warn("Not allowed to set diffbase on default branch.");
+                                    return SelectionReaction.STAY;
+                                }
+                                action = BranchAction.SET_DIFFBASE;
+                                return SelectionReaction.SELECT;
+                            })
                             .on('m', "move", (i, b, sel) -> {
                                 if (b.isDefault()) {
                                     sel.warn("Not allowed to rename default branch.");
                                     return SelectionReaction.STAY;
                                 }
                                 action = BranchAction.RENAME;
+                                return SelectionReaction.SELECT;
+                            })
+                            .hiddenOn('M', (i, b, sel) -> {
+                                if (b.isDefault()) {
+                                    sel.warn("Not allowed to rename default branch.");
+                                    return SelectionReaction.STAY;
+                                }
+                                action = BranchAction.RENAME;
+                                return SelectionReaction.SELECT;
+                            })
+                            .on('n', "new", (i, b, sel) -> {
+                                action = BranchAction.NEW;
+                                return SelectionReaction.SELECT;
+                            })
+                            .hiddenOn('N', (i, b, sel) -> {
+                                action = BranchAction.NEW;
                                 return SelectionReaction.SELECT;
                             })
                             .on('D', "delete", (i, b, sel) -> {
@@ -238,6 +268,87 @@ public class GtBranch extends Command {
                             tmpSelected = refreshBranchList(name);
                             break;
                         }
+                        case NEW: {
+                            var files = new ArrayList<SelectFile>();
+                            if (!selected.isDefault() && selected.diffBaseCommit() != null) {
+                                var ancestor = gt.lastCommonAncestor(selected.diffBaseCommit(), selected.commit());
+
+                                for (var diff : gt.diff(ancestor, selected.commit())) {
+                                    files.add(new SelectFile(diff));
+                                }
+                                if (!files.isEmpty()) {
+                                    try (var selector = Selection
+                                            .newBuilder(files)
+                                            .on(' ', "toggle", (i, file, selection) -> {
+                                                file.selected = !file.selected;
+                                                return SelectionReaction.UPDATE_KEEP_ITEM;
+                                            })
+                                            .on('a', "all", (i, file, selection) -> {
+                                                for (var f : files) {
+                                                    f.selected = true;
+                                                }
+                                                return SelectionReaction.UPDATE_KEEP_ITEM;
+                                            })
+                                            .on('n', "none", (i, file, selection) -> {
+                                                for (var f : files) {
+                                                    f.selected = false;
+                                                }
+                                                return SelectionReaction.UPDATE_KEEP_ITEM;
+                                            })
+                                            .on(Char.CR, "continue", SelectionReaction.SELECT)
+                                            .on('q', "abort", SelectionReaction.EXIT)
+                                            .hiddenOn(Char.ESC, SelectionReaction.EXIT)
+                                            .printer(SelectFile::displayLine)
+                                            .build()) {
+                                        if (selector.runSelection() == null) {
+                                            return;
+                                        }
+                                    } catch (Exception e) {
+                                        terminal.lp().error(e.getMessage());
+                                        e.printStackTrace(terminal.printStream());
+                                        return;
+                                    }
+                                }
+                            }
+                            var newName = terminal.readLine("New branch name");
+                            var all = !files.removeIf(f -> !f.selected);
+                            if (all) {
+                                gt.getGit().checkout()
+                                  .setName(selected.name())
+                                  .call();
+                            } else {
+                                gt.getGit().checkout()
+                                  .setName(selected.diffBase())
+                                  .call();
+                            }
+                            gt.getGit().checkout()
+                              .setCreateBranch(true)
+                              .setName(newName)
+                              .call();
+                            if (!files.isEmpty() && !all) {
+                                var root = gt.getRepositoryRoot();
+                                try (var reader = gt.getRepository().getObjectDatabase().newReader()) {
+                                    for (var f : files) {
+                                        if (f.entry.getChangeType() == DiffEntry.ChangeType.DELETE) {
+                                            Files.delete(root.resolve(f.entry.getOldPath()));
+                                        } else {
+                                            var file = root.resolve(f.entry.getNewPath());
+                                            if (!Files.exists(file.getParent())) {
+                                                Files.createDirectories(file.getParent());
+                                            }
+                                            try (var out = Files.newOutputStream(
+                                                    root.resolve(f.entry.getNewPath()),
+                                                    StandardOpenOption.CREATE,
+                                                    StandardOpenOption.TRUNCATE_EXISTING)) {
+                                                reader.open(f.entry.getNewId().toObjectId()).copyTo(out);
+                                            }
+                                        }
+                                    }
+                                }
+                                gt.getGit().add().addFilepattern(".").call();
+                            }
+                            return;
+                        }
                         case SET_DIFFBASE: {
                             List<BranchInfo> options = new LinkedList<>(branches)
                                     .stream()
@@ -263,7 +374,7 @@ public class GtBranch extends Command {
                                     .on('q', "quit", SelectionReaction.EXIT)
                                     .on('c', "clear", (ignore) -> {
                                         try {
-                                            StoredConfig config = gt.getRepository().getConfig();
+                                            StoredConfig config = gt.getConfig();
                                             config.unset("branch", selected.name(), "diffbase");
                                             config.save();
                                             return SelectionReaction.EXIT;
@@ -290,7 +401,7 @@ public class GtBranch extends Command {
                                 terminal.lp().println("");
                                 continue;
                             }
-                            StoredConfig config = gt.getGit().getRepository().getConfig();
+                            StoredConfig config = gt.getConfig();
                             config.setString("branch", selected.name(), "diffbase", newDiffBase.name());
                             config.save();
                             tmpSelected = refreshBranchList(selected.name());

@@ -15,6 +15,7 @@
  */
 package net.morimekta.gittool;
 
+import net.morimekta.collect.UnmodifiableList;
 import net.morimekta.collect.UnmodifiableSet;
 import net.morimekta.collect.util.LazyCachedSupplier;
 import net.morimekta.gittool.cmd.Command;
@@ -29,22 +30,24 @@ import net.morimekta.terminal.args.ArgHelp;
 import net.morimekta.terminal.args.ArgParser;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
-import org.eclipse.jgit.errors.MissingObjectException;
+import org.eclipse.jgit.diff.DiffEntry;
+import org.eclipse.jgit.errors.ConfigInvalidException;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.StoredConfig;
 import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 import org.eclipse.jgit.transport.RemoteConfig;
+import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 
 import static net.morimekta.terminal.args.Flag.flag;
@@ -55,23 +58,23 @@ import static net.morimekta.terminal.args.ValueParser.dir;
 
 public class GitTool {
     private static final String DOT_GIT = ".git";
-    public static Path pwd;
+    public static        Path   pwd;
 
     public final TTY tty;
 
     public ArgParser parser = null;
 
     private Command command = null;
-    private boolean help = false;
+    private boolean help    = false;
     private boolean version = false;
     private boolean verbose = false;
 
-    private Path repositoryRoot = null;
-    private Repository repository = null;
-    private Git git = null;
+    private Path         repositoryRoot = null;
+    private Repository   repository     = null;
+    private StoredConfig config         = null;
+    private Git          git            = null;
 
     private final Map<String, String> env;
-
 
     protected GitTool(TTY tty, Map<String, String> env) {
         this.tty = tty;
@@ -129,6 +132,18 @@ public class GitTool {
         return git;
     }
 
+    public StoredConfig getConfig() throws IOException {
+        if (config == null) {
+            config = getRepository().getConfig();
+            try {
+                config.load();
+            } catch (ConfigInvalidException e) {
+                throw new IOException(e);
+            }
+        }
+        return config;
+    }
+
     public boolean showHelp() {
         return (help || command == null);
     }
@@ -140,11 +155,11 @@ public class GitTool {
     private ArgParser makeParser() {
         return ArgParser
                 .argParser("gt",
-                        Utils.versionString(),
-                        "Extra git tools by morimekta")
+                           Utils.versionString(),
+                           "Extra git tools by morimekta")
                 .add(optionLong("--git_repository",
-                        "The git repository root directory",
-                        dir(this::setRepositoryRoot)))
+                                "The git repository root directory",
+                                dir(this::setRepositoryRoot)))
                 .add(flag("--help", "h?", "Show help", this::setHelp))
                 .add(flag("--version", "V", "Show program version", this::setVersion))
                 .add(flagLong("--verbose", "Show verbose exceptions", this::setVerbose))
@@ -156,59 +171,44 @@ public class GitTool {
                 .build();
     }
 
-    private static final String MASTER = "master";
+    private static final Set<String> MASTER_OPTS = Set.of(
+            "master", "develop", "main");
 
     public LazyCachedSupplier<String> defaultBranch = LazyCachedSupplier.lazyCache(() -> {
-        String tmp = repository.getConfig().getString("default", null, "branch");
-        if (tmp != null) {
-            return tmp;
+        try {
+            var cfg = getConfig();
+            String tmp = cfg.getString("default", null, "branch");
+            if (tmp != null) {
+                return tmp;
+            }
+            var branches = getGit().branchList().call();
+            for (var branch : branches) {
+                var name = branch.getName().replaceAll("^refs/heads/", "");
+                if (MASTER_OPTS.contains(name)) {
+                    return name;
+                }
+            }
+            // Otherwise just return first.
+            return branches.get(0).getName().replaceAll("^refs/heads/", "");
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        } catch (GitAPIException e) {
+            throw new RuntimeException(e);
         }
-        return MASTER;
     });
 
     public LazyCachedSupplier<Set<String>> remoteNames = LazyCachedSupplier.lazyCache(() -> {
         try {
             return getGit().remoteList()
-                    .call()
-                    .stream()
-                    .map(RemoteConfig::getName)
-                    .sorted()
-                    .collect(UnmodifiableSet.toSet());
+                           .call()
+                           .stream()
+                           .map(RemoteConfig::getName)
+                           .sorted()
+                           .collect(UnmodifiableSet.toSet());
         } catch (IOException | GitAPIException e) {
             throw new RuntimeException(e);
         }
     });
-
-    public String getDiffbase(String branch) {
-        String tmp = repository.getConfig().getString("branch", branch, "diffbase");
-        if (tmp != null) {
-            return tmp;
-        }
-        return defaultBranch.get();
-    }
-
-    public String getRemote(String branch) {
-        String remote = repository.getConfig().getString("branch", branch, "remote");
-        if (remote != null) {
-            String ref = repository.getConfig().getString("branch", branch, "merge");
-            if (ref != null) {
-                if (ref.startsWith("refs/heads/")) {
-                    return remote + "/" + ref.substring(11);
-                }
-            }
-        }
-        return null;
-    }
-
-    public Optional<RevCommit> commitOf(String branch) throws IOException {
-        ObjectId oid = getRepository().resolve(refName(branch));
-        if (oid == null) return Optional.empty();
-        try (RevWalk revWalk = new RevWalk(getRepository())) {
-            return Optional.ofNullable(revWalk.parseCommit(oid));
-        } catch (MissingObjectException e) {
-            return Optional.empty();
-        }
-    }
 
     public boolean isRemote(String branch) {
         // a/b is branch 'b' in remote 'a', so 'origin/master'...
@@ -217,6 +217,52 @@ public class GitTool {
             return remoteNames.get().contains(opt);
         }
         return false;
+    }
+
+    public RevCommit lastCommonAncestor(
+            RevCommit baseCommit,
+            RevCommit targetCommit) throws IOException, GitAPIException {
+        UnmodifiableList<RevCommit> remoteCommits = UnmodifiableList.asList(
+                getGit().log().addRange(targetCommit, baseCommit).call());
+        remoteCommits = remoteCommits.reversed();
+        if (!remoteCommits.isEmpty()) {
+            // Get the most recent commit before the oldest commit in the remote-only list.
+            List<RevCommit> sub2 = UnmodifiableList.asList(
+                    getGit().log()
+                            .add(remoteCommits.get(0))
+                            .setMaxCount(2)
+                            .call()).reversed();
+            return sub2.get(0);
+        } else {
+            // It is the base commit.
+            return baseCommit;
+        }
+    }
+
+    public record Log(List<RevCommit> local, List<RevCommit> remote) {}
+
+    public Log log(ObjectId baseIOD, ObjectId targetIOD) throws IOException, GitAPIException {
+        UnmodifiableList<RevCommit> localCommits = UnmodifiableList.asList(
+                getGit().log().addRange(baseIOD, targetIOD).call());
+        UnmodifiableList<RevCommit> remoteCommits = UnmodifiableList.asList(
+                getGit().log().addRange(targetIOD, baseIOD).call());
+        return new Log(localCommits.reversed(), remoteCommits.reversed());
+    }
+
+    public List<DiffEntry> diff(RevCommit baseRev, RevCommit targetRev) throws IOException, GitAPIException {
+        try (var reader = repository.newObjectReader()) {
+            var baseTreeIter = new CanonicalTreeParser();
+            baseTreeIter.reset(reader, baseRev.getTree());
+            var targetTreeIter = new CanonicalTreeParser();
+            targetTreeIter.reset(reader, targetRev.getTree());
+
+            // finally get the list of changed files
+            return git.diff()
+                      .setShowNameAndStatusOnly(true)
+                      .setOldTree(baseTreeIter)
+                      .setNewTree(targetTreeIter)
+                      .call();
+        }
     }
 
     public String refName(String branch) {

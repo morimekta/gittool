@@ -15,7 +15,6 @@
  */
 package net.morimekta.gittool.cmd;
 
-import net.morimekta.collect.UnmodifiableList;
 import net.morimekta.file.TemporaryAssetFolder;
 import net.morimekta.gittool.GitTool;
 import net.morimekta.gittool.util.BranchInfo;
@@ -24,18 +23,14 @@ import net.morimekta.terminal.args.ArgParser;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.diff.DiffEntry;
-import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 
 import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
@@ -70,61 +65,27 @@ public class GtDiff extends Command {
         Ref diffWithRef;
         if (branch != null) {
             diffWithRef = repository.getRefDatabase().findRef(gt.refName(branch));
+            if (diffWithRef == null) {
+                System.out.println("No ref found for " + branch);
+                return;
+            }
         } else {
             diffWithRef = repository.getRefDatabase().findRef(gt.refName(current.diffBase()));
+            if (diffWithRef == null) {
+                System.out.println("No ref found for " + current.diffBase());
+                return;
+            }
         }
-
-        ObjectId diffWithHead = diffWithRef.getObjectId();
-        ObjectId currentHead = currentRef.getObjectId();
-
-        if (currentHead.equals(diffWithHead) && !current.hasUncommitted()) {
+        BranchInfo diffWith = new BranchInfo(diffWithRef, gt);
+        if (current.commit().equals(diffWith.commit()) && !current.hasUncommitted()) {
             return;
         }
 
-        BranchInfo diffWith = new BranchInfo(diffWithRef, gt);
-
-        Git git = gt.getGit();
         // Map from last known file path, to diff entry.
         Map<String, GtDiffEntry> diffEntryMap = new TreeMap<>();
-        if (!currentHead.equals(diffWithHead)) {
-            UnmodifiableList<RevCommit> localCommits = UnmodifiableList.asList(
-                    git.log().addRange(diffWithHead, currentHead).call());
-            UnmodifiableList<RevCommit> remoteCommits = UnmodifiableList.asList(
-                    git.log().addRange(currentHead, diffWithHead).call());
-
-            localCommits = localCommits.reversed();
-            remoteCommits = remoteCommits.reversed();
-
-            RevCommit ancestor, local;
-            if (!remoteCommits.isEmpty()) {
-                List<RevCommit> sub2 = UnmodifiableList.asList(
-                        git.log()
-                           .add(remoteCommits.get(0))
-                           .setMaxCount(2)
-                           .call()).reversed();
-                ancestor = sub2.get(0);
-            } else {
-                ancestor = gt.commitOf(diffWith.name())
-                             .orElseThrow(() -> new IOException("No commit on " + diffWith.name()));
-            }
-            if (!localCommits.isEmpty()) {
-                local = localCommits.get(localCommits.size() - 1);
-            } else {
-                local = gt.commitOf(current.name())
-                          .orElseThrow(() -> new IOException("No commit on " + current.name()));
-            }
-
-            var reader = repository.newObjectReader();
-            var ancestorTreeIter = new CanonicalTreeParser();
-            ancestorTreeIter.reset(reader, ancestor.getTree());
-            var localTreeIter = new CanonicalTreeParser();
-            localTreeIter.reset(reader, local.getTree());
-
-            for (var entry : git.diff()
-                                .setShowNameAndStatusOnly(true)
-                                .setOldTree(ancestorTreeIter)
-                                .setNewTree(localTreeIter)
-                                .call()) {
+        if (!current.commit().equals(diffWith.commit())) {
+            var ancestor = gt.lastCommonAncestor(diffWith.commit(), current.commit());
+            for (var entry : gt.diff(ancestor, current.commit())) {
                 var gde = new GtDiffEntry();
                 gde.fromGitPath = entry.getOldPath();
                 gde.toGitPath = entry.getNewPath();
@@ -138,10 +99,10 @@ public class GtDiff extends Command {
             }
         }
         if (current.hasUncommitted()) {
-            for (var entry : git.diff()
-                                .setShowNameAndStatusOnly(true)
-                                .setCached(true)
-                                .call()) {
+            for (var entry : gt.getGit().diff()
+                               .setShowNameAndStatusOnly(true)
+                               .setCached(true)
+                               .call()) {
                 var gde = entry.getChangeType() == ADD
                           ? diffEntryMap.get(entry.getNewPath())
                           : diffEntryMap.get(entry.getOldPath());
@@ -166,10 +127,10 @@ public class GtDiff extends Command {
                     gde.staged = entry;
                 }
             }
-            for (var entry : git.diff()
-                                .setShowNameAndStatusOnly(true)
-                                .setCached(false)
-                                .call()) {
+            for (var entry : gt.getGit().diff()
+                               .setShowNameAndStatusOnly(true)
+                               .setCached(false)
+                               .call()) {
                 var gde = entry.getChangeType() == ADD
                           ? diffEntryMap.get(entry.getNewPath())
                           : diffEntryMap.get(entry.getOldPath());
