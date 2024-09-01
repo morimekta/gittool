@@ -98,6 +98,16 @@ public class Utils {
         }
     }
 
+    public static int countIter(Iterable<?> iter) {
+        int count = 0;
+        var iterator = iter.iterator();
+        while (iterator.hasNext()) {
+            iterator.next();
+            count++;
+        }
+        return count;
+    }
+
     public static String versionString() {
         Properties properties = new Properties();
         try (InputStream in = Utils.class.getResourceAsStream("/build.properties")) {

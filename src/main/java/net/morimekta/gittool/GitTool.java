@@ -50,6 +50,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
+import static net.morimekta.collect.util.LazyCachedSupplier.lazyCache;
 import static net.morimekta.terminal.args.Flag.flag;
 import static net.morimekta.terminal.args.Flag.flagLong;
 import static net.morimekta.terminal.args.Option.optionLong;
@@ -174,7 +175,7 @@ public class GitTool {
     private static final Set<String> MASTER_OPTS = Set.of(
             "master", "develop", "main");
 
-    public LazyCachedSupplier<String> defaultBranch = LazyCachedSupplier.lazyCache(() -> {
+    public LazyCachedSupplier<String> defaultBranch = lazyCache(() -> {
         try {
             var cfg = getConfig();
             String tmp = cfg.getString("default", null, "branch");
@@ -197,7 +198,7 @@ public class GitTool {
         }
     });
 
-    public LazyCachedSupplier<Set<String>> remoteNames = LazyCachedSupplier.lazyCache(() -> {
+    public LazyCachedSupplier<Set<String>> remoteNames = lazyCache(() -> {
         try {
             return getGit().remoteList()
                            .call()
@@ -206,6 +207,41 @@ public class GitTool {
                            .sorted()
                            .collect(UnmodifiableSet.toSet());
         } catch (IOException | GitAPIException e) {
+            throw new RuntimeException(e);
+        }
+    });
+
+    public LazyCachedSupplier<Boolean> hasUncommitted = lazyCache(() -> {
+        try {
+            var hasCached = !getGit()
+                    .diff()
+                    .setShowNameAndStatusOnly(true)
+                    .setCached(true)
+                    .call().isEmpty();
+            var hasUncached = getGit()
+                    .diff()
+                    .setShowNameAndStatusOnly(true)
+                    .setCached(false)
+                    .call()
+                    .stream()
+                    .anyMatch(i -> {
+                        if (i.getChangeType() == DiffEntry.ChangeType.DELETE) {
+                            try {
+                                var path = getRepositoryRoot().resolve(i.getOldPath());
+                                if (Files.isDirectory(path)) {
+                                    // Weirdness where it reports empty folders that are checked
+                                    // in as a folder as deleted.
+                                    return false;
+                                }
+                            } catch (IOException e) {
+                                return true;
+                            }
+                        }
+                        return true;
+                    });
+
+            return hasCached || hasUncached;
+        } catch (GitAPIException | IOException e) {
             throw new RuntimeException(e);
         }
     });

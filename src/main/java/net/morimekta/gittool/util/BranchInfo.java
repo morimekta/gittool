@@ -1,10 +1,8 @@
 package net.morimekta.gittool.util;
 
-import net.morimekta.collect.util.LazyCachedSupplier;
 import net.morimekta.gittool.GitTool;
 import net.morimekta.strings.chr.Color;
 import org.eclipse.jgit.api.errors.GitAPIException;
-import org.eclipse.jgit.diff.DiffEntry;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
@@ -13,15 +11,15 @@ import org.eclipse.jgit.revwalk.RevWalk;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.nio.file.Files;
 import java.util.Optional;
+import java.util.function.Supplier;
 
-import static net.morimekta.collect.UnmodifiableList.asList;
 import static net.morimekta.collect.util.LazyCachedSupplier.lazyCache;
 import static net.morimekta.gittool.util.Colors.RED_BOLD;
 import static net.morimekta.gittool.util.Colors.YELLOW_DIM;
 import static net.morimekta.gittool.util.Utils.addsAndDeletes;
 import static net.morimekta.gittool.util.Utils.clr;
+import static net.morimekta.gittool.util.Utils.countIter;
 import static net.morimekta.strings.StringUtil.rightPad;
 import static net.morimekta.strings.chr.Color.BG_BLUE;
 import static net.morimekta.strings.chr.Color.BLUE;
@@ -32,73 +30,42 @@ import static net.morimekta.strings.chr.Color.YELLOW;
 public class BranchInfo implements Comparable<BranchInfo> {
     private final String name;
 
-    private final LazyCachedSupplier<RevCommit> commit;
-    private final LazyCachedSupplier<Boolean>   isCurrent;
-    private final LazyCachedSupplier<Boolean>   isDefault;
-    private final LazyCachedSupplier<Boolean>   hasUncommitted;
+    private final Supplier<RevCommit> commit;
+    private final Supplier<Boolean>   isCurrent;
+    private final Supplier<Boolean>   isDefault;
+    private final Supplier<Boolean>   hasUncommitted;
 
-    private final LazyCachedSupplier<String>              diffBase;
-    private final LazyCachedSupplier<Boolean>             diffBaseIsDefault;
-    private final LazyCachedSupplier<Optional<Ref>>       diffBaseRef;
-    private final LazyCachedSupplier<Optional<RevCommit>> diffBaseCommit;
+    private final Supplier<String>              diffBase;
+    private final Supplier<Boolean>             diffBaseIsDefault;
+    private final Supplier<Optional<Ref>>       diffBaseRef;
+    private final Supplier<Optional<RevCommit>> diffBaseCommit;
+    private final Supplier<Integer>             diffBaseLocalCommits;
+    private final Supplier<Integer>             diffBaseMissingCommits;
 
-    private final LazyCachedSupplier<Optional<String>>    remote;
-    private final LazyCachedSupplier<Boolean>             remoteIsGone;
-    private final LazyCachedSupplier<Optional<Ref>>       remoteRef;
-    private final LazyCachedSupplier<Optional<RevCommit>> remoteCommit;
-
-    private final LazyCachedSupplier<Integer> localCommits;
-    private final LazyCachedSupplier<Integer> missingCommits;
+    private final Supplier<Optional<String>> remote;
+    private final Supplier<Boolean>          remoteIsGone;
+    private final Supplier<Optional<Ref>>    remoteRef;
+    private final Supplier<Integer>          remoteLocalCommits;
+    private final Supplier<Integer>          remoteMissingCommits;
 
     public BranchInfo(Ref currentRef, GitTool gt) {
-        this.name = currentRef.getName().startsWith("refs/heads/")
-                    ? currentRef.getName().substring(11)
-                    : currentRef.getName();
+        this.name = currentRef
+                .getName()
+                .replaceAll("^refs/(heads|remotes)/", "");
 
-        this.isCurrent = lazyCache(() -> {
+        this.isCurrent = () -> {
             try {
                 return currentRef.getName().equals(gt.getRepository().getFullBranch());
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
-        });
+        };
         this.isDefault = lazyCache(() -> name.equals(gt.defaultBranch.get()));
         this.hasUncommitted = lazyCache(() -> {
-            try {
-                if (isCurrent()) {
-                    var hasCached = !gt
-                            .getGit().diff()
-                            .setShowNameAndStatusOnly(true)
-                            .setCached(true)
-                            .call().isEmpty();
-                    var hasUncached = gt
-                            .getGit().diff()
-                            .setShowNameAndStatusOnly(true)
-                            .setCached(false)
-                            .call()
-                            .stream()
-                            .anyMatch(i -> {
-                                if (i.getChangeType() == DiffEntry.ChangeType.DELETE) {
-                                    try {
-                                        var path = gt.getRepositoryRoot().resolve(i.getOldPath());
-                                        if (Files.isDirectory(path)) {
-                                            // Weirdness where it reports empty folders that are checked
-                                            // in as a folder as deleted.
-                                            return false;
-                                        }
-                                    } catch (IOException e) {
-                                        return true;
-                                    }
-                                }
-                                return true;
-                            });
-
-                    return hasCached || hasUncached;
-                } else {
-                    return false;
-                }
-            } catch (GitAPIException | IOException e) {
-                throw new RuntimeException(e);
+            if (isCurrent()) {
+                return gt.hasUncommitted.get();
+            } else {
+                return false;
             }
         });
         this.commit = lazyCache(() -> {
@@ -121,9 +88,6 @@ public class BranchInfo implements Comparable<BranchInfo> {
                 String tmp = config.getString("branch", name, "diffbase");
                 if (tmp != null) {
                     return tmp;
-                }
-                if (isDefault() && remote() != null) {
-                    return remote();
                 }
                 return gt.defaultBranch.get();
             } catch (IOException e) {
@@ -152,6 +116,32 @@ public class BranchInfo implements Comparable<BranchInfo> {
                 throw new UncheckedIOException(e);
             }
         }));
+        this.diffBaseLocalCommits = lazyCache(() -> {
+            if (diffBase().equals(name)) return 0;
+            ObjectId currentHead = currentRef.getObjectId();
+            ObjectId diffWithHead = diffBaseRef.get().map(Ref::getObjectId).orElse(null);
+            if (diffWithHead == null || diffWithHead.equals(currentHead)) {
+                return 0;
+            }
+            try {
+                return countIter(gt.getGit().log().addRange(diffWithHead, currentHead).call());
+            } catch (GitAPIException | IOException e) {
+                throw new RuntimeException(e);
+            }
+        });
+        this.diffBaseMissingCommits = lazyCache(() -> {
+            if (diffBase().equals(name)) return 0;
+            ObjectId currentHead = currentRef.getObjectId();
+            ObjectId diffWithHead = diffBaseRef.get().map(Ref::getObjectId).orElse(null);
+            if (diffWithHead == null || diffWithHead.equals(currentHead)) {
+                return 0;
+            }
+            try {
+                return countIter(gt.getGit().log().addRange(currentHead, diffWithHead).call());
+            } catch (GitAPIException | IOException e) {
+                throw new RuntimeException(e);
+            }
+        });
 
         // -----------------
 
@@ -179,43 +169,27 @@ public class BranchInfo implements Comparable<BranchInfo> {
                 throw new UncheckedIOException(e);
             }
         }));
-        this.remoteCommit = lazyCache(() -> remoteRef.get().map(ref -> {
-            try {
-                try (RevWalk revWalk = new RevWalk(gt.getRepository())) {
-                    return revWalk.parseCommit(ref.getObjectId());
-                } catch (MissingObjectException e) {
-                    return null;
-                }
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
-        }));
-        this.remoteIsGone = lazyCache(() -> remoteCommit.get().isEmpty());
-
-        // -----------------
-
-        this.localCommits = lazyCache(() -> {
-            if (diffBase().equals(name)) return 0;
+        this.remoteIsGone = lazyCache(() -> remoteRef.get().isEmpty());
+        this.remoteLocalCommits = lazyCache(() -> {
             ObjectId currentHead = currentRef.getObjectId();
-            ObjectId diffWithHead = diffBaseRef.get().map(Ref::getObjectId).orElse(null);
+            ObjectId diffWithHead = remoteRef.get().map(Ref::getObjectId).orElse(null);
             if (diffWithHead == null || diffWithHead.equals(currentHead)) {
                 return 0;
             }
             try {
-                return asList(gt.getGit().log().addRange(diffWithHead, currentHead).call()).size();
+                return countIter(gt.getGit().log().addRange(diffWithHead, currentHead).call());
             } catch (GitAPIException | IOException e) {
                 throw new RuntimeException(e);
             }
         });
-        this.missingCommits = lazyCache(() -> {
-            if (diffBase().equals(name)) return 0;
+        this.remoteMissingCommits = lazyCache(() -> {
             ObjectId currentHead = currentRef.getObjectId();
-            ObjectId diffWithHead = diffBaseRef.get().map(Ref::getObjectId).orElse(null);
+            ObjectId diffWithHead = remoteRef.get().map(Ref::getObjectId).orElse(null);
             if (diffWithHead == null || diffWithHead.equals(currentHead)) {
                 return 0;
             }
             try {
-                return asList(gt.getGit().log().addRange(currentHead, diffWithHead).call()).size();
+                return countIter(gt.getGit().log().addRange(currentHead, diffWithHead).call());
             } catch (GitAPIException | IOException e) {
                 throw new RuntimeException(e);
             }
@@ -258,18 +232,14 @@ public class BranchInfo implements Comparable<BranchInfo> {
         return remote.get().orElse(null);
     }
 
-    public RevCommit remoteCommit() {
-        return remoteCommit.get().orElse(null);
-    }
-
     // --------------
 
     public int localCommits() {
-        return localCommits.get();
+        return diffBaseLocalCommits.get();
     }
 
     public int missingCommits() {
-        return missingCommits.get();
+        return diffBaseMissingCommits.get();
     }
 
     // --------------
@@ -288,7 +258,8 @@ public class BranchInfo implements Comparable<BranchInfo> {
         clr(builder, baseColor);
 
         if (localCommits() > 0 || missingCommits() > 0) {
-            builder.append(" ").append(addsAndDeletes(localCommits(), missingCommits(), baseColor));
+            builder.append(" ")
+                   .append(addsAndDeletes(localCommits(), missingCommits(), baseColor));
         }
 
         if (isCurrent() && hasUncommitted.get()) {
@@ -307,6 +278,12 @@ public class BranchInfo implements Comparable<BranchInfo> {
             }
             builder.append(remote());
             clr(builder, baseColor);
+            var local = remoteLocalCommits.get();
+            var missing = remoteMissingCommits.get();
+            if (local > 0 || missing > 0) {
+                builder.append(" ")
+                       .append(addsAndDeletes(local, missing, baseColor));
+            }
         } else if (!diffBaseIsDefault.get()) {
             builder.append(" d: ");
             if (diffBase().equals(name)) {

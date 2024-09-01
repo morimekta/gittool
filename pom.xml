@@ -75,12 +75,12 @@
             <dependency>
                 <groupId>net.morimekta.utils</groupId>
                 <artifactId>terminal-io</artifactId>
-                <version>5.0.0</version>
+                <version>5.0.1</version>
             </dependency>
             <dependency>
                 <groupId>net.morimekta.utils</groupId>
                 <artifactId>terminal-args</artifactId>
-                <version>5.0.0</version>
+                <version>5.0.1</version>
             </dependency>
             <dependency>
                 <groupId>net.morimekta.utils</groupId>
