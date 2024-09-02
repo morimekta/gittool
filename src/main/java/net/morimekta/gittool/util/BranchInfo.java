@@ -21,11 +21,7 @@ import static net.morimekta.gittool.util.Utils.addsAndDeletes;
 import static net.morimekta.gittool.util.Utils.clr;
 import static net.morimekta.gittool.util.Utils.countIter;
 import static net.morimekta.strings.StringUtil.rightPad;
-import static net.morimekta.strings.chr.Color.BG_BLUE;
-import static net.morimekta.strings.chr.Color.BLUE;
-import static net.morimekta.strings.chr.Color.DIM;
-import static net.morimekta.strings.chr.Color.GREEN;
-import static net.morimekta.strings.chr.Color.YELLOW;
+import static net.morimekta.strings.chr.Color.*;
 
 public class BranchInfo implements Comparable<BranchInfo> {
     private final String name;
@@ -272,7 +268,7 @@ public class BranchInfo implements Comparable<BranchInfo> {
             if (remoteIsGone.get()) {
                 builder.append(" gone: ").append(DIM);
             } else if (BG_BLUE.equals(baseColor)) {
-                builder.append(" -> ");
+                builder.append(" -> ").append(BOLD);
             } else {
                 builder.append(" -> ").append(BLUE);
             }
