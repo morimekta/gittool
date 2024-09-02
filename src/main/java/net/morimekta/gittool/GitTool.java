@@ -164,7 +164,7 @@ public class GitTool {
                 .add(flag("--help", "h?", "Show help", this::setHelp))
                 .add(flag("--version", "V", "Show program version", this::setVersion))
                 .add(flagLong("--verbose", "Show verbose exceptions", this::setVerbose))
-                .withSubCommands("cmd", "", this::setCommand)
+                .withSubCommands("cmd", "Command to act on git repo with", this::setCommand)
                 .add(subCommand("help", "Show help", GtHelp::new).alias("h"))
                 .add(subCommand("branch", "Change branch", parser -> new GtBranch()).alias("br", "b"))
                 .add(subCommand("status", "Review branch status", GtStatus::new).alias("st"))
