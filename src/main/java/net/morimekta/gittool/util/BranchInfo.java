@@ -296,6 +296,10 @@ public class BranchInfo implements Comparable<BranchInfo> {
             clr(builder, baseColor);
         }
 
+        builder.append(" ");
+        builder.append(commit().getShortMessage());
+        clr(builder, baseColor);
+
         return builder.toString();
 
     }
