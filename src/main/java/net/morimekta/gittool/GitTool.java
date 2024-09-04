@@ -22,6 +22,7 @@ import net.morimekta.gittool.cmd.Command;
 import net.morimekta.gittool.cmd.GtBranch;
 import net.morimekta.gittool.cmd.GtDiff;
 import net.morimekta.gittool.cmd.GtHelp;
+import net.morimekta.gittool.cmd.GtLog;
 import net.morimekta.gittool.cmd.GtStatus;
 import net.morimekta.gittool.util.Utils;
 import net.morimekta.io.tty.TTY;
@@ -75,11 +76,8 @@ public class GitTool {
     private StoredConfig config         = null;
     private Git          git            = null;
 
-    private final Map<String, String> env;
-
     protected GitTool(TTY tty, Map<String, String> env) {
         this.tty = tty;
-        this.env = env;
         pwd = Paths.get(env.get("PWD")).normalize().toAbsolutePath();
     }
 
@@ -169,6 +167,7 @@ public class GitTool {
                 .add(subCommand("branch", "Change branch", parser -> new GtBranch()).alias("br", "b"))
                 .add(subCommand("status", "Review branch status", GtStatus::new).alias("st"))
                 .add(subCommand("diff", "Diff changes", GtDiff::new).alias("d"))
+                .add(subCommand("log", "Log changes", GtLog::new).alias("l"))
                 .build();
     }
 

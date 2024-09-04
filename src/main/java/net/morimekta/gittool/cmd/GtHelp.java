@@ -76,6 +76,18 @@ public class GtHelp extends Command {
                     System.out.println();
                     argHelp(subCommandSet.parserForSubCommand("status")).printHelp(System.out);
                     break;
+                case "d":
+                case "diff":
+                    System.out.println(BOLD + "Show branch diff" + CLEAR);
+                    System.out.println();
+                    argHelp(subCommandSet.parserForSubCommand("diff")).printHelp(System.out);
+                    break;
+                case "l":
+                case "log":
+                    System.out.println(BOLD + "Show commit log" + CLEAR);
+                    System.out.println();
+                    argHelp(subCommandSet.parserForSubCommand("log")).printHelp(System.out);
+                    break;
                 case "help":
                     System.out.println(BOLD + "Show help information" + CLEAR);
                     System.out.println();
