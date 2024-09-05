@@ -24,4 +24,5 @@ Available sub-commands:
  branch : Change branch
  status : Review branch status
  diff   : Diff changes
+ log    : Log changes
 ```
