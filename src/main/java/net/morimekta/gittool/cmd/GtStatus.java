@@ -27,6 +27,7 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryState;
 
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -168,12 +169,33 @@ public class GtStatus extends Command {
             }
 
             // Check for staged and unstaged changes.
-            List<DiffEntry> staged = git.diff()
-                                        .setCached(true)
-                                        .call();
-            List<DiffEntry> unstaged = git.diff()
-                                          .setCached(false)
-                                          .call();
+            List<DiffEntry> staged = git
+                    .diff()
+                    .setShowNameAndStatusOnly(true)
+                    .setCached(true)
+                    .call();
+            List<DiffEntry> unstaged = git
+                    .diff()
+                    .setShowNameAndStatusOnly(true)
+                    .setCached(false)
+                    .call()
+                    .stream()
+                    .filter(i -> {
+                        if (i.getChangeType() == DiffEntry.ChangeType.DELETE) {
+                            try {
+                                var path = gt.getRepositoryRoot().resolve(i.getOldPath());
+                                if (Files.isDirectory(path)) {
+                                    // Weirdness where it reports empty folders that are checked
+                                    // in as a folder as deleted.
+                                    return false;
+                                }
+                            } catch (IOException e) {
+                                return true;
+                            }
+                        }
+                        return true;
+                    })
+                    .toList();
 
             if (!staged.isEmpty() || !unstaged.isEmpty()) {
                 System.out.println();
@@ -184,10 +206,11 @@ public class GtStatus extends Command {
                                   currentBranch,
                                   CLEAR);
 
-                Map<String, FileStatus> st = unstaged.stream()
-                                                     .map(d -> new FileStatus(relative, root, d))
-                                                     .collect(Collectors.toMap(
-                                                             FileStatus::getNewestPath, fs -> fs));
+                Map<String, FileStatus> st = unstaged
+                        .stream()
+                        .map(d -> new FileStatus(relative, root, d))
+                        .collect(Collectors.toMap(
+                                FileStatus::getNewestPath, fs -> fs));
                 staged.forEach(d -> {
                     if (d.getNewPath() != null) {
                         if (st.containsKey(d.getNewPath())) {
