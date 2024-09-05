@@ -17,6 +17,7 @@ package net.morimekta.gittool.cmd;
 
 import net.morimekta.gittool.GitTool;
 import net.morimekta.gittool.util.BranchInfo;
+import net.morimekta.gittool.util.Utils;
 import net.morimekta.terminal.args.ArgParser;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.lib.Ref;
@@ -24,8 +25,16 @@ import org.eclipse.jgit.lib.Repository;
 
 import java.io.IOException;
 
+import static java.lang.String.format;
+import static net.morimekta.gittool.util.Colors.YELLOW_DIM;
 import static net.morimekta.gittool.util.Utils.date;
-import static net.morimekta.strings.chr.Color.*;
+import static net.morimekta.strings.StringUtil.clipWidth;
+import static net.morimekta.strings.chr.Color.BLUE;
+import static net.morimekta.strings.chr.Color.BOLD;
+import static net.morimekta.strings.chr.Color.CLEAR;
+import static net.morimekta.strings.chr.Color.DIM;
+import static net.morimekta.strings.chr.Color.GREEN;
+import static net.morimekta.strings.chr.Color.RED;
 import static net.morimekta.terminal.args.Flag.flag;
 import static net.morimekta.terminal.args.Option.option;
 
@@ -33,9 +42,9 @@ import static net.morimekta.terminal.args.Option.option;
  * Interactively manage branches.
  */
 public class GtLog extends Command {
-    private String branch = null;
-    private boolean left = false;
-    private boolean right = false;
+    private String  branch = null;
+    private boolean left   = false;
+    private boolean right  = false;
     private boolean remote = false;
 
     public GtLog(ArgParser.Builder builder) {
@@ -48,6 +57,7 @@ public class GtLog extends Command {
     @Override
     public void execute(GitTool gt) throws IOException {
         try {
+            var width = gt.terminalWidth();
             if (!left && !right) {
                 left = true;
             }
@@ -75,41 +85,41 @@ public class GtLog extends Command {
             if (!current.commit().equals(diffWith.commit())) {
                 var log = gt.log(diffWith.commit(), current.commit());
 
+                String diff = gt.isRemote(diffWithBranch)
+                              ? format("->%s%s%s", BLUE, diffWithBranch, CLEAR)
+                              : format("d:%s%s%s", YELLOW_DIM, diffWithBranch, CLEAR);
+
                 if (left) {
                     var leftLog = log.local();
                     var ancestor = gt.lastCommonAncestor(diffWith.commit(), current.commit());
                     if (leftLog.isEmpty()) {
-                        System.out.printf("No commits on %s%s%s since %s -- %s%s%s%n",
-                                GREEN,
-                                currentBranch,
-                                CLEAR,
-                                date(ancestor),
-                                DIM,
-                                ancestor.getShortMessage(),
-                                CLEAR);
+                        Utils.println(
+                                "No commits on on %s%s%s since %s [%s]".formatted(
+                                        GREEN, currentBranch, CLEAR, date(ancestor), diff),
+                                " -- %s%s%s".formatted(DIM, ancestor.getShortMessage(), CLEAR),
+                                width);
                     } else {
-                        System.out.printf("Commits on %s%s%s since %s -- %s%s%s%n",
-                                GREEN,
-                                currentBranch,
-                                CLEAR,
-                                date(ancestor),
-                                DIM,
-                                ancestor.getShortMessage(),
-                                CLEAR);
+                        Utils.println(
+                                "Commits on on %s%s%s since %s [%s]".formatted(
+                                        GREEN, currentBranch, CLEAR, date(ancestor), diff),
+                                " -- %s%s%s".formatted(DIM, ancestor.getShortMessage(), CLEAR),
+                                width);
                         System.out.println();
                         leftLog.forEach(co -> {
-                            System.out.printf(
-                                    "+ %s%s%s %s %s%s%s%n",
-                                    GREEN,
-                                    co.getName().substring(0, 7),
-                                    CLEAR,
-                                    date(co),
-                                    DIM,
-                                    co.getShortMessage(),
-                                    CLEAR);
+                            System.out.println(clipWidth(
+                                    "+ %s%s%s %s %s%s%s".formatted(
+                                            GREEN,
+                                            co.abbreviate(7).name(),
+                                            CLEAR,
+                                            date(co),
+                                            DIM,
+                                            co.getShortMessage(),
+                                            CLEAR),
+                                    width));
                         });
                     }
                 }
+
                 if (right) {
                     if (left) {
                         System.out.println();
@@ -118,46 +128,39 @@ public class GtLog extends Command {
                     var rightLog = log.remote();
                     var ancestor = gt.lastCommonAncestor(current.commit(), diffWith.commit());
                     if (rightLog.isEmpty()) {
-                        System.out.printf("No commits on %s%s%s since %s -- %s%s%s%n",
-                                RED,
-                                diffWithBranch,
-                                CLEAR,
-                                date(ancestor),
-                                DIM,
-                                ancestor.getShortMessage(),
-                                CLEAR);
+                        Utils.println(
+                                "No commits on %s%s%s since %s [%s]".formatted(
+                                        RED, diffWithBranch, CLEAR, date(ancestor), diff),
+                                " -- %s%s%s".formatted(DIM, ancestor.getShortMessage(), CLEAR),
+                                width);
                     } else {
-                        System.out.printf("Commits on %s%s%s since %s -- %s%s%s%n",
-                                RED,
-                                diffWithBranch,
-                                CLEAR,
-                                date(ancestor),
-                                DIM,
-                                ancestor.getShortMessage(),
-                                CLEAR);
+                        Utils.println(
+                                "Commits on on %s%s%s since %s [%s]".formatted(
+                                        RED, diffWithBranch, CLEAR, date(ancestor), diff),
+                                " -- %s%s%s".formatted(DIM, ancestor.getShortMessage(), CLEAR),
+                                width);
                         System.out.println();
                         rightLog.forEach(co -> {
-                            System.out.printf(
-                                    "- %s%s%s %s %s%s%s%n",
-                                    RED,
-                                    co.getName().substring(0, 7),
-                                    CLEAR,
-                                    date(co),
-                                    DIM,
-                                    co.getShortMessage(),
-                                    CLEAR);
+                            System.out.println(clipWidth(
+                                    "- %s%s%s %s %s%s%s".formatted(
+                                            RED,
+                                            co.abbreviate(7).name(),
+                                            CLEAR,
+                                            date(co),
+                                            DIM,
+                                            co.getShortMessage(),
+                                            CLEAR),
+                                    width));
                         });
                     }
                 }
             } else {
-                System.out.printf("No commits on %s%s%s since %s -- %s%s%s%n",
-                        BLUE,
-                        currentBranch,
-                        CLEAR,
-                        date(current.commit()),
-                        DIM,
-                        current.commit().getShortMessage(),
-                        CLEAR);
+                Utils.println(
+                        "No commits on %s%s%s since %s".formatted(
+                                BLUE, currentBranch, CLEAR, date(current.commit())),
+                        " -- %s%s%s".formatted(
+                                DIM, current.commit().getShortMessage(), CLEAR),
+                        width);
             }
         } catch (GitAPIException e) {
             throw new IllegalStateException(e.getMessage(), e);

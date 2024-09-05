@@ -26,7 +26,12 @@ import org.eclipse.jgit.diff.DiffEntry;
 import java.nio.file.Path;
 
 import static net.morimekta.gittool.GitTool.pwd;
-import static net.morimekta.strings.chr.Color.*;
+import static net.morimekta.strings.chr.Color.BOLD;
+import static net.morimekta.strings.chr.Color.CLEAR;
+import static net.morimekta.strings.chr.Color.DIM;
+import static net.morimekta.strings.chr.Color.GREEN;
+import static net.morimekta.strings.chr.Color.RED;
+import static net.morimekta.strings.chr.Color.YELLOW;
 
 /**
  * The status of a single change in diff.
@@ -35,7 +40,7 @@ import static net.morimekta.strings.chr.Color.*;
  * - unstaged git
  */
 public class FileStatus {
-    private final Path root;
+    private final Path    root;
     private final boolean relative;
 
     private DiffEntry staged;
@@ -69,7 +74,7 @@ public class FileStatus {
             }
             // With if the file was copies at least *once*, then it is copied.
             if (staged.getChangeType() == DiffEntry.ChangeType.COPY ||
-                    unstaged.getChangeType() == DiffEntry.ChangeType.COPY) {
+                unstaged.getChangeType() == DiffEntry.ChangeType.COPY) {
                 return DiffEntry.ChangeType.COPY;
             }
             return DiffEntry.ChangeType.RENAME;
@@ -95,7 +100,7 @@ public class FileStatus {
             };
         } else {
             return "" + stageChangeLetter(staged.getChangeType())
-                    + stageChangeLetter(unstaged.getChangeType());
+                   + stageChangeLetter(unstaged.getChangeType());
         }
     }
 
@@ -160,14 +165,18 @@ public class FileStatus {
                 break;
         }
 
-        builder.append(path(getNewestPath()));
-        builder.append(CLEAR);
-
-        if (!getNewestPath().equals(getOldestPath())) {
-            builder.append(" <- ");
-            builder.append(DIM);
+        if (getOverallChange() == DiffEntry.ChangeType.DELETE) {
             builder.append(path(getOldestPath()));
             builder.append(CLEAR);
+        } else {
+            builder.append(path(getNewestPath()));
+            builder.append(CLEAR);
+            if (!getNewestPath().equals(getOldestPath())) {
+                builder.append(" <- ");
+                builder.append(DIM);
+                builder.append(path(getOldestPath()));
+                builder.append(CLEAR);
+            }
         }
 
         return builder.toString();

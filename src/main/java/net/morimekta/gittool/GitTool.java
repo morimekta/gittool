@@ -81,6 +81,14 @@ public class GitTool {
         pwd = Paths.get(env.get("PWD")).normalize().toAbsolutePath();
     }
 
+    public int terminalWidth() {
+        try {
+            return tty.getTerminalSize().cols;
+        } catch (Exception e) {
+            return 80;
+        }
+    }
+
     private void setRepositoryRoot(Path git_root) {
         this.repositoryRoot = git_root;
     }

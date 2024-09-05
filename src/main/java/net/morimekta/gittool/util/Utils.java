@@ -20,6 +20,7 @@
  */
 package net.morimekta.gittool.util;
 
+import net.morimekta.strings.StringUtil;
 import net.morimekta.strings.chr.Color;
 import org.eclipse.jgit.revwalk.RevCommit;
 
@@ -37,6 +38,7 @@ import java.util.Properties;
 import static java.lang.String.format;
 import static net.morimekta.gittool.util.Colors.GREEN_BOLD;
 import static net.morimekta.gittool.util.Colors.RED_BOLD;
+import static net.morimekta.strings.StringUtil.clipWidth;
 import static net.morimekta.strings.chr.Color.CLEAR;
 
 /**
@@ -142,6 +144,16 @@ public class Utils {
             throw new UncheckedIOException(e);
         } catch (NullPointerException e) {
             throw new IllegalArgumentException(e.getMessage(), e);
+        }
+    }
+
+    public static void println(String line, String append, int maxWidth) {
+        var all = line + append;
+        if (StringUtil.printableWidth(line + append) > maxWidth) {
+            System.out.println(clipWidth(line, maxWidth));
+            System.out.println(clipWidth(append, maxWidth));
+        } else {
+            System.out.println(clipWidth(all, maxWidth));
         }
     }
 }

@@ -19,6 +19,7 @@ import net.morimekta.file.FileUtil;
 import net.morimekta.gittool.GitTool;
 import net.morimekta.gittool.util.BranchInfo;
 import net.morimekta.gittool.util.FileStatus;
+import net.morimekta.gittool.util.Utils;
 import net.morimekta.terminal.args.ArgParser;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.diff.DiffEntry;
@@ -40,6 +41,8 @@ import static net.morimekta.gittool.util.Colors.YELLOW_BOLD;
 import static net.morimekta.gittool.util.Colors.YELLOW_DIM;
 import static net.morimekta.gittool.util.Utils.addsAndDeletes;
 import static net.morimekta.gittool.util.Utils.date;
+import static net.morimekta.strings.StringUtil.clipWidth;
+import static net.morimekta.strings.StringUtil.printableWidth;
 import static net.morimekta.strings.chr.Color.BLUE;
 import static net.morimekta.strings.chr.Color.BOLD;
 import static net.morimekta.strings.chr.Color.CLEAR;
@@ -78,14 +81,17 @@ public class GtStatus extends Command {
     @Override
     public void execute(GitTool gt) throws IOException {
         try {
+            var width = gt.terminalWidth();
+
             Repository repository = gt.getRepository();
             RepositoryState state = repository.getRepositoryState();
             if (state != RepositoryState.SAFE) {
-                System.out.println(YELLOW_BOLD
-                                   + "Repository not in a safe state"
-                                   + CLEAR
-                                   + ": "
-                                   + state.getDescription());
+                System.out.println(clipWidth(
+                        YELLOW_BOLD
+                        + "Repository not in a safe state"
+                        + CLEAR
+                        + ": "
+                        + state.getDescription(), width));
             }
 
             var git = gt.getGit();
@@ -98,74 +104,68 @@ public class GtStatus extends Command {
             String diffWithBranch = branch != null ? branch : current.diffBase();
             Ref diffWithRef = repository.getRefDatabase().findRef(gt.refName(diffWithBranch));
             if (diffWithRef == null) {
-                System.out.printf("No such branch %s%s%s%n", BOLD, diffWithBranch, CLEAR);
+                System.out.println(clipWidth(
+                        "No such branch %s%s%s".formatted(BOLD, diffWithBranch, CLEAR), width));
                 return;
             }
+            String diff = gt.isRemote(diffWithBranch)
+                          ? format("->%s%s%s", BLUE, diffWithBranch, CLEAR)
+                          : format("d:%s%s%s", YELLOW_DIM, diffWithBranch, CLEAR);
 
             var diffWith = new BranchInfo(diffWithRef, gt);
 
             if (!current.commit().equals(diffWith.commit())) {
-                String stats = "";
-                String diff = gt.isRemote(diffWithBranch)
-                              ? format("[->%s%s%s] ", BLUE, diffWithBranch, CLEAR)
-                              : format("[d:%s%s%s] ", YELLOW_DIM, diffWithBranch, CLEAR);
-
                 var log = gt.log(diffWith.commit(), current.commit());
-
                 int commits = log.local().size();
                 int missing = log.remote().size();
-
+                String stats = "";
                 if (commits > 0 || missing > 0) {
                     stats = " " + addsAndDeletes(commits, missing, null);
                 }
 
                 var ancestor = gt.lastCommonAncestor(diffWith.commit(), current.commit());
 
-                System.out.printf("Commits on %s%s%s%s since %s -- %s%s%s%s%n",
-                                  YELLOW_BOLD,
-                                  currentBranch,
-                                  CLEAR,
-                                  stats,
-                                  date(ancestor),
-                                  diff,
-                                  DIM,
-                                  ancestor.getShortMessage(),
-                                  CLEAR);
+                Utils.println(
+                        "Committed on %s%s%s%s since %s [%s]".formatted(
+                                GREEN, currentBranch, CLEAR, stats, date(ancestor), diff),
+                        " -- %s%s%s".formatted(DIM, ancestor.getShortMessage(), CLEAR),
+                        width);
 
-                for (DiffEntry entry : gt.diff(ancestor, current.commit())) {
-                    switch (entry.getChangeType()) {
-                        case RENAME:
-                            System.out.printf(" R %s%s%s <- %s%s%s%n",
-                                              YELLOW_DIM, entry.getNewPath(), CLEAR,
-                                              DIM, path(entry.getOldPath()), CLEAR);
-                            break;
-                        case MODIFY:
-                            System.out.printf("   %s%n", path(entry.getOldPath()));
-                            break;
-                        case ADD:
-                            System.out.printf(" A %s%s%s%n",
-                                              GREEN, path(entry.getNewPath()), CLEAR);
-                            break;
-                        case DELETE:
-                            System.out.printf(" D %s%s%s%n",
-                                              YELLOW, path(entry.getOldPath()), CLEAR);
-                            break;
-                        case COPY:
-                            System.out.printf(" C %s%s%s <- %s%s%s%n",
-                                              YELLOW_DIM, path(entry.getNewPath()), CLEAR,
-                                              DIM, path(entry.getOldPath()), CLEAR);
-                            break;
+                var diffEntries = gt.diff(ancestor, current.commit());
+                if (!diffEntries.isEmpty()) {
+                    System.out.println();
+                    for (DiffEntry entry : diffEntries) {
+                        switch (entry.getChangeType()) {
+                            case RENAME:
+                                System.out.printf(" R %s%s%s <- %s%s%s%n",
+                                                  YELLOW_DIM, entry.getNewPath(), CLEAR,
+                                                  DIM, path(entry.getOldPath()), CLEAR);
+                                break;
+                            case MODIFY:
+                                System.out.printf("   %s%n", path(entry.getOldPath()));
+                                break;
+                            case ADD:
+                                System.out.printf(" A %s%s%s%n",
+                                                  GREEN, path(entry.getNewPath()), CLEAR);
+                                break;
+                            case DELETE:
+                                System.out.printf(" D %s%s%s%n",
+                                                  YELLOW, path(entry.getOldPath()), CLEAR);
+                                break;
+                            case COPY:
+                                System.out.printf(" C %s%s%s <- %s%s%s%n",
+                                                  YELLOW_DIM, path(entry.getNewPath()), CLEAR,
+                                                  DIM, path(entry.getOldPath()), CLEAR);
+                                break;
+                        }
                     }
                 }
             } else {
-                System.out.printf("No commits on %s%s%s since %s -- %s%s%s%n",
-                                  GREEN,
-                                  currentBranch,
-                                  CLEAR,
-                                  date(diffWith.commit()),
-                                  DIM,
-                                  diffWith.commit().getShortMessage(),
-                                  CLEAR);
+                Utils.println(
+                        "No commits on %s%s%s since %s [%s]".formatted(
+                                GREEN, currentBranch, CLEAR, date(diffWith.commit()), diff),
+                        " -- %s%s%s".formatted(DIM, diffWith.commit().getShortMessage(), CLEAR),
+                        width);
             }
 
             // Check for staged and unstaged changes.
@@ -205,6 +205,7 @@ public class GtStatus extends Command {
                                   YELLOW_BOLD,
                                   currentBranch,
                                   CLEAR);
+                System.out.println();
 
                 Map<String, FileStatus> st = unstaged
                         .stream()
