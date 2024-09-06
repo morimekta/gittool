@@ -26,3 +26,24 @@ Available sub-commands:
  diff   : Diff changes
  log    : Log changes
 ```
+
+## Release
+
+```shell
+mvn release:prepare
+
+VERSION="$(git tag | semver --max)"
+DL="$(gt-repo -d dl.morimekta.net)"
+
+cp "target/gittool-${VERSION}.tar.gz" "$DL/dl/archive/"
+cp "target/gittool-${VERSION}_all.deb" "$DL/dl/deb/"
+cp "target/rpm/gittool/RPMS/noarch/gittool-${VERSION}.noarch.rpm" "$DL/dl/rpm/"
+
+mvn release:clean
+git fetch origin
+
+cd $DL
+make clean
+make
+make upload
+```
