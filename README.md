@@ -37,7 +37,7 @@ DL="$(gt-repo -d dl.morimekta.net)"
 
 cp "target/gittool-${VERSION}.tar.gz" "$DL/dl/archive/"
 cp "target/gittool-${VERSION}_all.deb" "$DL/dl/deb/"
-cp "target/rpm/gittool/RPMS/noarch/gittool-${VERSION}.noarch.rpm" "$DL/dl/rpm/"
+cp "target/rpm/gittool/RPMS/noarch/gittool-${VERSION}-1.noarch.rpm" "$DL/dl/rpm/"
 
 mvn release:clean
 git fetch origin
