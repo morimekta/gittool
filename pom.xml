@@ -3,7 +3,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>net.morimekta.gittool</groupId>
     <artifactId>gittool</artifactId>
-    <version>3.1</version>
+    <version>3.2-SNAPSHOT</version>
     <packaging>jar</packaging>
 
     <name>Git-Tool</name>
@@ -44,7 +44,7 @@
     <scm>
         <url>https://github.com/morimekta/gittool.git</url>
         <developerConnection>scm:git:ssh://git@github.com/morimekta/gittool.git</developerConnection>
-        <tag>v3.1</tag>
+        <tag>HEAD</tag>
     </scm>
 
     <properties>
