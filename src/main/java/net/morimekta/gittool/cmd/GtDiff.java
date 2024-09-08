@@ -139,6 +139,10 @@ public class GtDiff extends Command {
                     gde.fromGitPath = entry.getOldPath();
                     gde.toGitPath = entry.getNewPath();
                     if (entry.getChangeType() == DELETE) {
+                        var np = gt.getRepositoryRoot().resolve(gde.fromGitPath);
+                        if (Files.isDirectory(np)) {
+                            continue;
+                        }
                         gde.key = gde.fromGitPath;
                     } else {
                         gde.key = gde.toGitPath;

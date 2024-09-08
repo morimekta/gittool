@@ -272,10 +272,17 @@ public class GtBranch extends Command {
 
     private boolean handleNew(Terminal terminal, BranchInfo selected) throws IOException, GitAPIException {
         var files = new ArrayList<SelectFile>();
+        var root = gt.getRepositoryRoot();
+
         if (!selected.isDefault() && selected.diffBaseCommit() != null) {
             var ancestor = gt.lastCommonAncestor(selected.diffBaseCommit(), selected.commit());
 
             for (var diff : gt.diff(ancestor, selected.commit())) {
+                if (diff.getChangeType() == DiffEntry.ChangeType.DELETE) {
+                    if (Files.isDirectory(root.resolve(diff.getOldPath()))) {
+                        continue;
+                    }
+                }
                 files.add(new SelectFile(diff));
             }
             if (!files.isEmpty()) {
@@ -322,17 +329,21 @@ public class GtBranch extends Command {
         }
 
         if (selected.isDefault()) {
-            gt.getGit().checkout()
-              .setName(selected.name())
-              .call();
+            if (!selected.isCurrent()) {
+                gt.getGit().checkout()
+                  .setName(selected.name())
+                  .call();
+            }
             gt.getGit().checkout()
               .setCreateBranch(true)
               .setName(newName)
               .call();
         } else {
-            gt.getGit().checkout()
-              .setName(selected.diffBase())
-              .call();
+            if (!selected.diffBase().equals(currentInfo.name())) {
+                gt.getGit().checkout()
+                  .setName(selected.diffBase())
+                  .call();
+            }
             gt.getGit().checkout()
               .setCreateBranch(true)
               .setName(newName)
@@ -340,7 +351,6 @@ public class GtBranch extends Command {
 
             files.removeIf(f -> !f.selected);
             if (!files.isEmpty()) {
-                var root = gt.getRepositoryRoot();
                 try (var reader = gt.getRepository().getObjectDatabase().newReader()) {
                     for (var f : files) {
                         if (f.entry.getChangeType() == DiffEntry.ChangeType.DELETE) {
