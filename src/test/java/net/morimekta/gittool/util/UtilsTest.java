@@ -22,8 +22,6 @@ package net.morimekta.gittool.util;
 
 import org.junit.jupiter.api.Test;
 
-import static java.io.File.separator;
-import static org.hamcrest.CoreMatchers.endsWith;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.notNullValue;
 import static org.hamcrest.CoreMatchers.startsWith;
@@ -34,11 +32,5 @@ public class UtilsTest {
     public void testVersion() {
         assertThat(Utils.versionString(), is(notNullValue()));
         assertThat(Utils.versionString(), startsWith("v"));
-    }
-
-    @Test
-    public void testShareLocation() {
-        // When testing it is the /target directory of the build.
-        assertThat(Utils.shareLocation().toString(), endsWith(separator + "target" + separator + "classes"));
     }
 }

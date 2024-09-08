@@ -20,7 +20,6 @@
  */
 package net.morimekta.gittool.util;
 
-import net.morimekta.strings.StringUtil;
 import net.morimekta.strings.chr.Color;
 import org.eclipse.jgit.revwalk.RevCommit;
 
@@ -39,6 +38,7 @@ import static java.lang.String.format;
 import static net.morimekta.gittool.util.Colors.GREEN_BOLD;
 import static net.morimekta.gittool.util.Colors.RED_BOLD;
 import static net.morimekta.strings.StringUtil.clipWidth;
+import static net.morimekta.strings.StringUtil.printableWidth;
 import static net.morimekta.strings.chr.Color.CLEAR;
 
 /**
@@ -102,9 +102,7 @@ public class Utils {
 
     public static int countIter(Iterable<?> iter) {
         int count = 0;
-        var iterator = iter.iterator();
-        while (iterator.hasNext()) {
-            iterator.next();
+        for (Object ignore : iter) {
             count++;
         }
         return count;
@@ -120,36 +118,9 @@ public class Utils {
         }
     }
 
-    public static File shareLocation() {
-        try {
-            // If run from the 'normal' jar in the share directory, then the location of the
-            // jar file is the share directory for gittool.
-            File location = new File(Utils.class.getProtectionDomain()
-                                                .getCodeSource()
-                                                .getLocation()
-                                                .toURI()
-                                                .getPath())
-                    .getCanonicalFile().getAbsoluteFile();
-            if (location.isDirectory()) {
-                // E.g. .../gittool-gt/target/classes
-                // contains the resources locally
-                return location;
-            } else {
-                // E.g. /usr/local/share/gittool/gt.jar
-                return location.getParentFile();
-            }
-        } catch (URISyntaxException e) {
-            throw new RuntimeException(e.getMessage(), e);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        } catch (NullPointerException e) {
-            throw new IllegalArgumentException(e.getMessage(), e);
-        }
-    }
-
-    public static void println(String line, String append, int maxWidth) {
+    public static void print1or2ln(String line, String append, int maxWidth) {
         var all = line + append;
-        if (StringUtil.printableWidth(line + append) > maxWidth) {
+        if (!append.isEmpty() && printableWidth(all) > maxWidth) {
             System.out.println(clipWidth(line, maxWidth));
             System.out.println(clipWidth(append, maxWidth));
         } else {

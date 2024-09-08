@@ -42,7 +42,6 @@ import static net.morimekta.gittool.util.Colors.YELLOW_DIM;
 import static net.morimekta.gittool.util.Utils.addsAndDeletes;
 import static net.morimekta.gittool.util.Utils.date;
 import static net.morimekta.strings.StringUtil.clipWidth;
-import static net.morimekta.strings.StringUtil.printableWidth;
 import static net.morimekta.strings.chr.Color.BLUE;
 import static net.morimekta.strings.chr.Color.BOLD;
 import static net.morimekta.strings.chr.Color.CLEAR;
@@ -125,7 +124,7 @@ public class GtStatus extends Command {
 
                 var ancestor = gt.lastCommonAncestor(diffWith.commit(), current.commit());
 
-                Utils.println(
+                Utils.print1or2ln(
                         "Committed on %s%s%s%s since %s [%s]".formatted(
                                 GREEN, currentBranch, CLEAR, stats, date(ancestor), diff),
                         " -- %s%s%s".formatted(DIM, ancestor.getShortMessage(), CLEAR),
@@ -161,7 +160,7 @@ public class GtStatus extends Command {
                     }
                 }
             } else {
-                Utils.println(
+                Utils.print1or2ln(
                         "No commits on %s%s%s since %s [%s]".formatted(
                                 GREEN, currentBranch, CLEAR, date(diffWith.commit()), diff),
                         " -- %s%s%s".formatted(DIM, diffWith.commit().getShortMessage(), CLEAR),
