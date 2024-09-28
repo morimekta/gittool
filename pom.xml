@@ -462,7 +462,7 @@
 
                             <!-- dependencies -->
                             <requires>
-                                <require>java &gt;= 17</require>
+                                <require>jre-headless &gt;= 17</require>
                             </requires>
 
                             <!-- mapping -->
