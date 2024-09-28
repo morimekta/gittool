@@ -8,4 +8,4 @@ Maintainer: Stein Eldar Johnsen (oss@morimekta.net)
 Homepage: http://www.morimekta.net/gittool
 Vcs-Browser: http://www.github.com/morimekta/gittool
 Distribution: development
-Depends: java17-runtime | java21-runtime
+Depends: java17-runtime-headless | java21-runtime-headless
